@@ -365,23 +365,16 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--li
 /* =========================================================
    ★ Firebase 設定：把 Firebase 主控台給你的設定貼在這裡 ★
    ========================================================= */
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBS_LFnYySNNj6FGK8WZKPbN8LTORKayRY",
-  authDomain: "picminer-e34cf.firebaseapp.com",
-  projectId: "picminer-e34cf",
-  storageBucket: "picminer-e34cf.firebasestorage.app",
-  messagingSenderId: "987076813654",
-  appId: "1:987076813654:web:a03e655d1cc442a7a46cf7"
+  apiKey: "請貼上你的 apiKey",
+  authDomain: "你的專案.firebaseapp.com",
+  projectId: "你的專案",
+  storageBucket: "你的專案.firebasestorage.app",
+  messagingSenderId: "",
+  appId: ""
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const FIREBASE_VERSION = '12.18.0';
+const FIREBASE_READY = !/請貼上|你的專案/.test(firebaseConfig.apiKey + firebaseConfig.projectId);
 /* =========================================================
    設定值
    ========================================================= */

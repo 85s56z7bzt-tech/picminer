@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // 礦工名片（暱稱、頭貼、好友代碼、最高分）：登入的人都能看，只能改自己的
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow write: if isMe(uid);
+    }
+
+    // 好友清單：登入的人都能看（用來判斷互加），只能改自己的
+    match /links/{uid} {
+      allow read: if signedIn();
+      allow write: if isMe(uid);
+    }
+
+    // 個人遊戲進度和道具：只有自己看得到、改得到
+    match /data/users/{uid}/{docId} {
+      allow read, write: if isMe(uid);
+    }
+
+    // 貼文：登入的人都能看，只能發、改、刪自己的
+    match /posts/{uid}/items/{postId} {
+      allow read: if signedIn();
+      allow write: if isMe(uid);
+    }
+
+    // 留言：只能用自己的名義留言；自己的留言、或留在自己貼文下的留言可以刪
+    match /comments/{cid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 200;
+      allow delete: if signedIn()
+        && (resource.data.by == request.auth.uid
+            || resource.data.post.split('~')[0] == request.auth.uid);
+    }
+
+    // 表情回應：只能用自己的名義；貼文作者刪貼文時可以一起清掉
+    match /reactions/{rid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.by == request.auth.uid
+        && rid.split('~')[2] == request.auth.uid;
+      allow delete: if signedIn()
+        && (resource.data.by == request.auth.uid
+            || resource.data.post.split('~')[0] == request.auth.uid);
+    }
+  }
+}
