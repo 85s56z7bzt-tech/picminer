@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Picminer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4EFFA; --surface:#FFFFFF; --surface-2:#ECE4F6; --ink:#22163A; --ink-2:#6E5F8A; --line:#DDD2EC;
+  --citrine:#E9A23B; --well:#2A2040; --well-cell:#382B52;
+  --ok:#30A46C; --bad:#E5484D;
+  --t-common:#8B97AD; --t-rare:#3E8EDE; --t-epic:#A855F7; --t-legend:#E9A23B;
+  --sheet-shade:rgba(20,12,34,.45);
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#160F22; --surface:#221836; --surface-2:#2D2145; --ink:#F1EAFB; --ink-2:#A898C4; --line:#3A2C55;
+    --well:#0F0A19; --well-cell:#231936; --sheet-shade:rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#160F22; --surface:#221836; --surface-2:#2D2145; --ink:#F1EAFB; --ink-2:#A898C4; --line:#3A2C55;
+  --well:#0F0A19; --well-cell:#231936; --sheet-shade:rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--citrine);outline-offset:2px}
+input,textarea{font:inherit;color:inherit}
+.num{font-family:"Bricolage Grotesque","Noto Sans TC",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+
+#app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;position:relative}
+.topbar{display:flex;align-items:center;gap:8px;padding:10px 16px 8px;flex:none}
+.wordmark{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:24px;letter-spacing:-.02em;display:flex;align-items:center;gap:6px;margin-right:auto}
+.wordmark svg{width:22px;height:22px}
+.chip{display:flex;align-items:center;gap:4px;height:32px;padding:0 10px;border-radius:16px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:700}
+.chip svg{width:16px;height:16px}
+.avatar-btn{width:36px;height:36px;border-radius:50%;overflow:hidden;border:2px solid var(--line);flex:none;background:var(--surface-2)}
+.avatar-btn img,.av img{width:100%;height:100%;object-fit:cover;display:block}
+
+main{flex:1;min-height:0;position:relative}
+.tab{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;-webkit-overflow-scrolling:touch}
+.tab.active{display:block}
+.pad{padding:4px 16px 24px}
+
+.tabbar{flex:none;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line)}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;font-size:12px;color:var(--ink-2);font-weight:500;position:relative}
+.tabbar button svg{width:24px;height:24px}
+.tabbar button[aria-selected="true"]{color:var(--ink)}
+.tabbar button[aria-selected="true"] svg{color:var(--citrine)}
+.tabbar .dot{position:absolute;top:6px;left:calc(50% + 8px);width:8px;height:8px;border-radius:50%;background:var(--bad);display:none}
+
+/* ---------- Game ---------- */
+.scorerow{display:flex;align-items:flex-end;gap:12px;margin:2px 0 10px}
+.score-big{font-size:40px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.score-meta{font-size:13px;color:var(--ink-2);line-height:1.3;padding-bottom:3px}
+.icon-btn{margin-left:auto;height:36px;padding:0 12px;border-radius:18px;border:1px solid var(--line);background:var(--surface);font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px}
+.icon-btn svg{width:16px;height:16px}
+.progress{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2);margin-bottom:12px}
+.bar{flex:1;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--citrine);border-radius:4px;transition:width .3s}
+
+.board-wrap{position:relative;width:100%;max-width:400px;margin:0 auto}
+.board{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;padding:8px;border-radius:18px;background:var(--well);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.04),inset 0 -2px 0 rgba(0,0,0,.3);touch-action:none;aspect-ratio:1}
+/* 格子的底（礦坑）永遠保留；寶石畫在 ::before 上，消除時只有寶石會碎掉 */
+.cell{border-radius:6px;background:var(--well-cell);box-shadow:inset 0 2px 3px rgba(0,0,0,.35);position:relative}
+.cell::before,.pc{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.55) 0 22%,transparent 23% 60%,rgba(0,0,0,.18) 61%),
+    linear-gradient(160deg,color-mix(in srgb,var(--g) 65%,white),var(--g) 50%,color-mix(in srgb,var(--g) 70%,black));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),inset 0 -3px 0 rgba(0,0,0,.25),0 0 8px color-mix(in srgb,var(--g) 40%,transparent)}
+.cell::before{content:"";position:absolute;inset:0;border-radius:6px;opacity:0}
+.cell.gem::before{opacity:1}
+.cell.shatter::before{opacity:1;animation:shatter .45s ease-in forwards}
+@keyframes shatter{0%{transform:scale(1)}30%{transform:scale(1.2);filter:brightness(2.6)}100%{transform:scale(.1) rotate(35deg);opacity:0;filter:brightness(3)}}
+.cell.hint{outline:2px dashed rgba(255,255,255,.55);outline-offset:-3px;background:color-mix(in srgb,var(--g) 45%,var(--well-cell))}
+.cell.hint.bad{background:color-mix(in srgb,var(--bad) 35%,var(--well-cell));outline-color:var(--bad)}
+.cell.willclear::before{filter:brightness(1.5) saturate(1.2)}
+.floater{position:absolute;transform:translate(-50%,-50%);font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:18px;color:#fff;
+  text-shadow:0 2px 0 rgba(0,0,0,.4);pointer-events:none;animation:floatup .9s ease-out forwards;white-space:nowrap;z-index:4}
+@keyframes floatup{to{transform:translate(-50%,-160%);opacity:0}}
+
+/* 消除特效 */
+.beam{position:absolute;pointer-events:none;border-radius:10px;z-index:3;mix-blend-mode:screen;
+  box-shadow:0 0 18px var(--bc),0 0 40px var(--bc)}
+.beam.h{background:linear-gradient(90deg,transparent,var(--bc) 12%,#fff 50%,var(--bc) 88%,transparent);animation:beamh .75s ease-out forwards}
+.beam.v{background:linear-gradient(180deg,transparent,var(--bc) 12%,#fff 50%,var(--bc) 88%,transparent);animation:beamv .75s ease-out forwards}
+@keyframes beamh{0%{opacity:0;transform:scaleX(.1)}25%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1.06) scaleY(1.6)}}
+@keyframes beamv{0%{opacity:0;transform:scaleY(.1)}25%{opacity:1;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1.06) scaleX(1.6)}}
+.combo{position:absolute;left:50%;top:44%;z-index:6;pointer-events:none;white-space:nowrap;
+  font-family:"Bricolage Grotesque",sans-serif;font-weight:800;letter-spacing:-.01em;color:var(--cc);
+  -webkit-text-stroke:1.5px rgba(255,255,255,.9);
+  text-shadow:0 0 6px var(--cc),0 0 18px var(--cc),0 0 36px var(--cc),0 4px 0 rgba(0,0,0,.45);
+  animation:combo 1.3s cubic-bezier(.2,1.5,.4,1) forwards}
+.combo.rainbow{background:linear-gradient(90deg,#ff4d6d,#ffb84d,#fff35c,#4dff9a,#4dc3ff,#b84dff,#ff4d6d);background-size:200% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;-webkit-text-stroke:2px #fff;
+  filter:drop-shadow(0 0 8px #fff) drop-shadow(0 0 22px #ff6bd6);animation:combo 1.6s cubic-bezier(.2,1.5,.4,1) forwards,rb .6s linear infinite}
+@keyframes rb{to{background-position:200% 0}}
+@keyframes combo{0%{transform:translate(-50%,-50%) scale(.2) rotate(-10deg);opacity:0}22%{transform:translate(-50%,-50%) scale(1.2) rotate(3deg);opacity:1}40%{transform:translate(-50%,-50%) scale(1) rotate(0)}80%{opacity:1;transform:translate(-50%,-55%)}100%{opacity:0;transform:translate(-50%,-95%) scale(.95)}}
+.spark{position:absolute;left:50%;top:44%;width:9px;height:9px;border-radius:2px;background:var(--pc);z-index:5;pointer-events:none;
+  box-shadow:0 0 8px var(--pc);animation:spark 1s ease-out forwards}
+@keyframes spark{to{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.4);opacity:0}}
+.bflash{position:absolute;inset:0;border-radius:18px;z-index:2;pointer-events:none;background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.75),rgba(255,255,255,0) 70%);animation:bflash .7s ease-out forwards}
+@keyframes bflash{from{opacity:1}to{opacity:0}}
+.board-wrap.shake{animation:shake .45s ease-out}
+@keyframes shake{15%{transform:translate(calc(var(--a)*-1),calc(var(--a)*.6))}30%{transform:translate(var(--a),calc(var(--a)*-.6))}45%{transform:translate(calc(var(--a)*-.7),calc(var(--a)*-.3))}60%{transform:translate(calc(var(--a)*.5),calc(var(--a)*.4))}80%{transform:translate(calc(var(--a)*-.2),0)}100%{transform:none}}
+
+.gameover{position:absolute;inset:0;border-radius:18px;background:rgba(15,10,25,.82);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:20px;z-index:7}
+.gameover h3{margin:0;font-size:20px}
+.gameover .num{font-size:44px;font-weight:800}
+
+.tray{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:400px;margin:14px auto 0}
+.slot{aspect-ratio:1;border-radius:14px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative;touch-action:none;user-select:none;-webkit-user-select:none}
+.slot.lifting>.piece{opacity:.25}
+.slot.helper{border-style:dashed}
+.slot.helper.ready{border:2px solid var(--citrine);box-shadow:0 0 0 4px color-mix(in srgb,var(--citrine) 25%,transparent)}
+.slot.helper:not(.ready)>.piece{opacity:.35;filter:grayscale(.6)}
+.slot-label{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:12px;color:var(--ink-2)}
+.tray-gap{height:24px}
+.piece{position:relative;pointer-events:none}
+.pc{position:absolute;border-radius:4px}
+.ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;filter:drop-shadow(0 8px 12px rgba(0,0,0,.35))}
+.ghost .pc{border-radius:6px}
+.hint-text{text-align:center;font-size:13px;color:var(--ink-2);margin-top:6px}
+
+/* ---------- Camera ---------- */
+#tab-camera{background:#000;color:#fff;overflow:hidden}
+.cam{position:absolute;inset:0;display:flex;flex-direction:column}
+.cam-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:8px;flex:none}
+.cam-pill{height:36px;padding:0 14px;border-radius:18px;background:rgba(255,255,255,.14);display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500}
+.cam-pill svg{width:18px;height:18px}
+.cam-pill.on{background:#FFD54A;color:#2a1b00}
+.stage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
+.stage canvas{max-width:100%;max-height:100%;aspect-ratio:3/4;border-radius:16px;background:#111}
+.stage video{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.cam-fallback{position:absolute;inset:16px;border-radius:16px;background:#1b1426;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;color:#e9e1f6;width:auto}
+.cam-fallback p{margin:0;font-size:14px;color:#bfb2d6;max-width:30ch}
+.zoom{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(0,0,0,.4);padding:4px;border-radius:20px}
+.zoom button{width:38px;height:30px;border-radius:15px;font-size:13px;font-weight:700}
+.zoom button[aria-pressed="true"]{background:#fff;color:#000}
+.filter-strip{display:flex;gap:8px;overflow-x:auto;padding:10px 14px 4px;flex:none;scrollbar-width:none}
+.filter-strip::-webkit-scrollbar{display:none}
+.fchip{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;width:62px;color:#d8cfe8}
+.fchip canvas{width:52px;height:52px;border-radius:12px;border:2px solid transparent;display:block}
+.fchip[aria-pressed="true"]{color:#fff;font-weight:700}
+.fchip[aria-pressed="true"] canvas{border-color:#FFD54A}
+.fchip .cnt{font-size:11px;opacity:.8}
+.cam-bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:8px 24px 14px;flex:none}
+.round{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;gap:1px}
+.round svg{width:22px;height:22px}
+.shutter{width:76px;height:76px;border-radius:50%;border:4px solid #fff;padding:5px}
+.shutter i{display:block;width:100%;height:100%;border-radius:50%;background:#fff;transition:transform .1s}
+.shutter:active i{transform:scale(.9)}
+
+/* ---------- Photo editor (stickers) ---------- */
+.editor{position:relative;width:100%;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:#000;touch-action:none;user-select:none;-webkit-user-select:none}
+.editor>.ed-base{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.stk{height:auto;max-width:none}
+.stk{position:absolute;transform-origin:50% 50%;touch-action:none;cursor:grab;-webkit-user-drag:none}
+.stk.sel{outline:2px dashed #fff;outline-offset:4px;filter:drop-shadow(0 0 6px rgba(0,0,0,.5))}
+.ed-tools{display:flex;gap:6px;justify-content:center;margin:10px 0 2px;min-height:34px}
+.stk-tray{display:flex;gap:8px;overflow-x:auto;padding:8px 2px 4px;scrollbar-width:none}
+.stk-tray::-webkit-scrollbar{display:none}
+.stk-btn{flex:none;width:66px;height:66px;border-radius:14px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative}
+.stk-btn img{max-width:52px;max-height:44px}
+.stk-btn .cnt{position:absolute;right:4px;bottom:2px;font-size:11px;font-weight:700;color:var(--ink-2)}
+textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--line);background:var(--surface);padding:10px 14px;resize:none;display:block}
+
+/* ---------- Friends ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px}
+.me-card{display:flex;align-items:center;gap:12px}
+.av{width:44px;height:44px;border-radius:50%;overflow:hidden;background:var(--surface-2);flex:none}
+.av.sm{width:34px;height:34px}
+.av.xs{width:26px;height:26px}
+.me-name{font-weight:700;font-size:17px}
+.code{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;letter-spacing:.12em;font-size:15px}
+.muted{color:var(--ink-2);font-size:13px}
+.btn{height:44px;padding:0 18px;border-radius:22px;background:var(--ink);color:var(--bg);font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.ghosty{background:var(--surface-2);color:var(--ink)}
+.btn.small{height:34px;padding:0 14px;font-size:14px;border-radius:17px}
+.btn.gold{background:var(--citrine);color:#2a1b00}
+.btn:disabled{opacity:.4}
+.addrow{display:flex;gap:8px;margin-top:12px}
+.addrow input{flex:1;min-width:0;height:44px;border-radius:22px;border:1px solid var(--line);background:var(--surface);padding:0 16px;text-transform:uppercase;letter-spacing:.12em;font-family:"Bricolage Grotesque",sans-serif;font-weight:600}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface-2);border-radius:14px;padding:4px;margin:16px 0 12px}
+.seg button{height:36px;border-radius:10px;font-size:14px;font-weight:500;color:var(--ink-2)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.post{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:14px}
+.post-head{display:flex;align-items:center;gap:10px;padding:10px 8px 10px 12px}
+.post-head .name{font-weight:700;font-size:15px;line-height:1.2}
+.dots{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-2)}
+.dots svg{width:20px;height:20px}
+.post>img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--surface-2)}
+.post-foot{display:flex;align-items:center;gap:6px;padding:10px 12px 4px;flex-wrap:wrap}
+.react{height:34px;padding:0 10px;border-radius:17px;background:var(--surface-2);display:flex;align-items:center;gap:4px;font-size:14px}
+.react[aria-pressed="true"]{background:color-mix(in srgb,var(--citrine) 30%,var(--surface));box-shadow:inset 0 0 0 1.5px var(--citrine)}
+.tag{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--surface-2);color:var(--ink-2);margin-left:auto}
+.caption{padding:4px 12px 0;margin:0;font-size:15px;white-space:pre-wrap;word-break:break-word}
+.caption b{margin-right:6px}
+.edited{font-size:12px;color:var(--ink-2);margin-left:4px}
+.comments{padding:6px 12px 12px}
+.cmt{display:flex;gap:8px;padding:5px 0;align-items:flex-start}
+.cmt .body{flex:1;min-width:0;font-size:14px;line-height:1.45;word-break:break-word;white-space:pre-wrap}
+.cmt .body b{margin-right:6px}
+.cmt .meta{font-size:12px;color:var(--ink-2);margin-top:1px}
+.cmt .meta button{font-size:12px;color:var(--ink-2);text-decoration:underline;margin-left:8px}
+.more{font-size:14px;color:var(--ink-2);padding:4px 0}
+.cmt-input{display:flex;gap:8px;align-items:center;margin-top:6px}
+.cmt-input input{flex:1;min-width:0;height:38px;border-radius:19px;border:1px solid var(--line);background:var(--bg);padding:0 14px;font-size:14px}
+.list-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.list-item:last-child{border-bottom:0}
+.list-item .grow{flex:1;min-width:0}
+.rank{width:24px;text-align:center;font-weight:800}
+.empty{text-align:center;padding:32px 16px;color:var(--ink-2)}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+.banner{border-radius:14px;padding:10px 14px;font-size:13px;margin-bottom:12px;background:color-mix(in srgb,var(--citrine) 18%,var(--surface));border:1px solid color-mix(in srgb,var(--citrine) 45%,transparent)}
+.section-title{font-size:15px;font-weight:700;margin:18px 0 8px}
+.row2{display:flex;gap:10px}
+.row2 .btn{flex:1}
+.menu{display:flex;flex-direction:column;gap:8px}
+.menu-item{height:50px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:16px;font-weight:500}
+.menu-item.danger{color:var(--bad)}
+
+/* ---------- Bag ---------- */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:left}
+.stat .num{font-size:28px;font-weight:800;line-height:1.1}
+.stat .muted{font-size:12px}
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.fcard{background:var(--surface);border-radius:16px;padding:8px;border:2px solid var(--line);text-align:left;position:relative}
+.fcard canvas{width:100%;aspect-ratio:4/5;border-radius:10px;display:block}
+.fcard .fn{font-weight:700;font-size:14px;margin-top:6px;line-height:1.2}
+.fcard .ft{font-size:11px;font-weight:700}
+.fcard .fc{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:700;padding:1px 7px;border-radius:9px}
+.fcard.locked canvas{filter:brightness(.25) blur(2px)}
+.fcard.locked .fn{color:var(--ink-2)}
+.fcard.equipped{border-color:var(--citrine);box-shadow:0 0 0 3px color-mix(in srgb,var(--citrine) 30%,transparent)}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.scard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 4px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.scard .art{height:46px;display:flex;align-items:center;justify-content:center}
+.scard img{max-width:60px;max-height:46px}
+.scard .sn{font-size:12px;color:var(--ink-2);line-height:1.2;text-align:center}
+.scard .fc{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:700;padding:0 6px;border-radius:8px}
+.scard.locked img{filter:grayscale(1) brightness(.35);opacity:.6}
+.tier-common{color:var(--t-common)} .tier-rare{color:var(--t-rare)} .tier-epic{color:var(--t-epic)} .tier-legend{color:var(--t-legend)}
+.odds{font-size:13px;color:var(--ink-2);line-height:1.8}
+.odds b{color:var(--ink)}
+
+/* ---------- Toast / Sheet ---------- */
+#toasts{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 10px);z-index:90;display:flex;flex-direction:column;gap:8px;width:min(92vw,420px);pointer-events:none}
+.toast{pointer-events:auto;background:var(--ink);color:var(--bg);border-radius:16px;padding:8px 12px;font-size:14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:tin .25s ease-out}
+.toast canvas,.toast img{width:40px;height:50px;border-radius:8px;flex:none;object-fit:contain}
+.toast .tt{font-weight:700}
+.toast.tiered{border-left:6px solid var(--tc)}
+@keyframes tin{from{transform:translateY(-12px);opacity:0}}
+.toast.out{transition:opacity .25s,transform .25s;opacity:0;transform:translateY(-8px)}
+.sheet-wrap{position:fixed;inset:0;z-index:70;background:var(--sheet-shade);display:none;align-items:flex-end;justify-content:center}
+.sheet-wrap.open{display:flex}
+.sheet{width:100%;max-width:480px;max-height:94%;overflow-y:auto;background:var(--bg);border-radius:24px 24px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom,0px));animation:sup .25s ease-out}
+@keyframes sup{from{transform:translateY(40px);opacity:.4}}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.sheet h2{font-size:20px;margin:0 0 6px}
+.sheet p{margin:0 0 12px;color:var(--ink-2);font-size:14px}
+.sheet .actions{display:flex;gap:10px;margin-top:16px}
+.sheet .actions .btn{flex:1}
+.field{display:block;margin:12px 0}
+.field span{display:block;font-size:13px;color:var(--ink-2);margin-bottom:6px}
+.field input{width:100%;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--surface);padding:0 14px}
+.big-av{width:84px;height:84px;border-radius:50%;overflow:hidden;margin:4px auto 6px;background:var(--surface-2)}
+.big-av img{width:100%;height:100%;object-fit:cover}
+.center{text-align:center}
+.linkish{color:var(--ink);text-decoration:underline;font-size:14px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="wordmark">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 8l8 14 8-14z" fill="#8E4EC6"/><path d="M4 8h16L12 2z" fill="#B583E0"/><path d="M12 8 8 8l4 14z" fill="#6A2FA0" opacity=".6"/></svg>
+      Picminer
+    </div>
+    <div class="chip num" title="拍照機會"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.5"/><path d="M9 7l1.5-3h3L15 7"/></svg><span id="chipTokens">0</span></div>
+    <div class="chip num" title="相簿上傳券"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="8.5" r="1.5"/></svg><span id="chipUploads">0</span></div>
+    <button class="avatar-btn" id="avatarBtn" aria-label="設定"></button>
+  </header>
+
+  <main>
+    <section class="tab active" id="tab-game" role="tabpanel">
+      <div class="pad">
+        <div class="scorerow">
+          <div class="score-big num" id="score">0</div>
+          <div class="score-meta">分數<br>最高 <span class="num" id="best">0</span></div>
+          <button class="icon-btn" id="resetBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>重來</button>
+        </div>
+        <div class="progress"><span id="nextLabel">下一次拍照機會</span><div class="bar"><i id="bar"></i></div><span class="num" id="dailyLabel">0/6</span></div>
+        <div class="board-wrap" id="boardWrap"><div class="board" id="board"></div></div>
+        <div class="tray" id="tray"></div>
+        <div class="tray-gap"></div>
+        <div class="hint-text">把下方的礦石拖進礦坑，填滿一整排或一整列就能挖開</div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-camera" role="tabpanel">
+      <div class="cam">
+        <div class="cam-top">
+          <button class="cam-pill" id="flashBtn" aria-pressed="false"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span id="flashLabel">閃光燈 關</span></button>
+          <div class="cam-pill num" id="camTokens">拍照機會 0</div>
+        </div>
+        <div class="stage">
+          <video id="video" playsinline muted autoplay></video>
+          <canvas id="preview" width="360" height="480"></canvas>
+          <button class="cam-fallback" id="camFallback">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.5"/><path d="M9 7l1.5-3h3L15 7"/></svg>
+            <div id="camFallbackTitle" style="font-weight:700;font-size:17px">正在開啟相機…</div>
+            <p id="camFallbackText"></p>
+            <span class="btn gold" id="nativeShotBtn" style="display:none">打開手機相機</span>
+          </button>
+          <div class="zoom" id="zoomCtl">
+            <button data-z="1" aria-pressed="true">1x</button>
+            <button data-z="2" aria-pressed="false">2x</button>
+          </div>
+        </div>
+        <div class="filter-strip" id="filterStrip"></div>
+        <div class="cam-bottom">
+          <button class="round" id="albumBtn" style="justify-self:start" aria-label="從相簿上傳"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg><span class="num" id="albumCount">0</span></button>
+          <button class="shutter" id="shutter" aria-label="拍照"><i></i></button>
+          <button class="round" id="flipBtn" style="justify-self:end" aria-label="切換鏡頭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg></button>
+        </div>
+      </div>
+      <input type="file" id="nativeInput" accept="image/*" capture="environment" hidden>
+      <input type="file" id="albumInput" accept="image/*" hidden>
+    </section>
+
+    <section class="tab" id="tab-friends" role="tabpanel"><div class="pad" id="friendsPane"></div></section>
+    <section class="tab" id="tab-bag" role="tabpanel"><div class="pad" id="bagPane"></div></section>
+  </main>
+
+  <nav class="tabbar" role="tablist">
+    <button role="tab" data-tab="game" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 4c3 0 6 2 7 5-3-1-6-1-9 1"/><path d="M14 4c-1 2-1 4 0 6"/><path d="m12 10-9 10"/></svg>挖礦</button>
+    <button role="tab" data-tab="camera" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="3"/><circle cx="12" cy="13.5" r="3.5"/><path d="M9 7l1.5-3h3L15 7"/></svg>相機</button>
+    <button role="tab" data-tab="friends" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 5.5 5.3"/></svg>好友<span class="dot" id="friendDot"></span></button>
+    <button role="tab" data-tab="bag" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 9a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/><path d="M9 6V5a3 3 0 0 1 6 0v1"/><path d="M5 13h14"/></svg>背包</button>
+  </nav>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div class="sheet-wrap" id="sheetWrap"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+</div>
+
+<script type="module">
+'use strict';
+/* =========================================================
+   ★ Firebase 設定：把 Firebase 主控台給你的設定貼在這裡 ★
+   ========================================================= */
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBS_LFnYySNNj6FGK8WZKPbN8LTORKayRY",
+  authDomain: "picminer-e34cf.firebaseapp.com",
+  projectId: "picminer-e34cf",
+  storageBucket: "picminer-e34cf.firebasestorage.app",
+  messagingSenderId: "987076813654",
+  appId: "1:987076813654:web:a03e655d1cc442a7a46cf7"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+/* =========================================================
+   設定值
+   ========================================================= */
+const TARGET_SCORE = 5000;       // 每 5000 分換 1 次拍照機會
+const DAILY_TOKEN_CAP = 6;
+// 每放下一塊礦石的掉落機率
+const DROP = { gem: 0.02, filter: 0.05, sticker: 0.05, upload: 0.015 };
+const HELPER_HIT = 3;            // 每消一格挖礦：3/256 ≈ 1.2%
+const POST_TTL = 24 * 3600 * 1000;
+const CONTACT = '411277035@mail.nknu.edu.tw';
+const TORCH_FAIL_MSG = '蘋果用戶無法使用閃光燈';
+
+const SHAPES = {
+  single:[[0,0]], line3:[[0,0],[0,1],[0,2]], line4:[[0,0],[0,1],[0,2],[0,3]],
+  square2:[[0,0],[0,1],[1,0],[1,1]], L3:[[0,0],[1,0],[2,0],[2,1]], L2:[[0,0],[1,0],[1,1]],
+  T3:[[0,0],[0,1],[0,2],[1,1]], Z3:[[0,0],[0,1],[1,1],[1,2]], bigL:[[0,0],[1,0],[2,0],[3,0],[3,1]],
+  plus:[[1,0],[0,1],[1,1],[2,1],[1,2]]
+};
+const GEM_COLORS = ['#E5484D','#F5B83D','#30A46C','#3E63DD','#8E4EC6','#E86A92','#F76B15'];
+const HELPER_GEM = 6;
+
+// 消除幾行 → 用什麼字和特效
+const COMBOS = [null,
+  {text:'Excellent!',     color:'#FF3B4E', size:44, shake:0, sparks:0},
+  {text:'Amazing!!',      color:'#FF8A1F', size:48, shake:5, sparks:16},
+  {text:'Incredible!!!',  color:'#C04DFF', size:50, shake:8, sparks:30, flash:true},
+  {text:'LEGENDARY!!!!',  color:'#FFD23F', size:50, shake:12, sparks:50, flash:true, rainbow:true}
+];
+
+const TIERS = {
+  common:{name:'普通', w:62, cls:'tier-common', color:'var(--t-common)'},
+  rare:{name:'稀有', w:27, cls:'tier-rare', color:'var(--t-rare)'},
+  epic:{name:'史詩', w:9, cls:'tier-epic', color:'var(--t-epic)'},
+  legend:{name:'傳說', w:2, cls:'tier-legend', color:'var(--t-legend)'}
+};
+const FILTERS = [
+  {id:'mono', name:'黑白', tier:'common'}, {id:'soft', name:'柔焦', tier:'common'}, {id:'sepia', name:'復古', tier:'common'},
+  {id:'warm', name:'暖陽', tier:'common'}, {id:'cool', name:'冷藍', tier:'common'},
+  {id:'film', name:'底片', tier:'rare'}, {id:'neon', name:'霓虹', tier:'rare'}, {id:'pixel', name:'像素', tier:'rare'}, {id:'dream', name:'粉霧', tier:'rare'},
+  {id:'pride', name:'驕傲彩虹', tier:'epic'}, {id:'poster', name:'色階海報', tier:'epic'}, {id:'stardust', name:'星塵', tier:'epic'},
+  {id:'gold', name:'鎏金', tier:'legend'}, {id:'kaleido', name:'萬花鏡', tier:'legend'}
+];
+const F = Object.fromEntries(FILTERS.map(f=>[f.id,f]));
+
+const STICKERS = [
+  {id:'lol', e:'😂', name:'笑哭'}, {id:'clown', e:'🤡', name:'小丑'}, {id:'skull', e:'💀', name:'笑到往生'},
+  {id:'eyeroll', e:'🙄', name:'翻白眼'}, {id:'melt', e:'🫠', name:'融化'}, {id:'frog', e:'🐸', name:'青蛙'},
+  {id:'duck', e:'🦆', name:'鴨鴨'}, {id:'boba', e:'🧋', name:'珍奶'}, {id:'crown', e:'👑', name:'皇冠'}, {id:'cool', e:'😎', name:'墨鏡'},
+  {id:'t_lol', t:'笑死', bg:'#FF4D6D'}, {id:'t_shock', t:'傻眼', bg:'#4D7CFF'}, {id:'t_lazy', t:'我就爛', bg:'#8A5CF6'},
+  {id:'t_ok', t:'好喔', bg:'#22B573'}, {id:'t_hello', t:'是在哈囉', bg:'#FF8A1F'}, {id:'t_read', t:'已讀不回', bg:'#5B6478'},
+  {id:'t_huh', t:'蛤？', bg:'#F2B33D', fg:'#2a1b00'}, {id:'t_nice', t:'讚啦', bg:'#E5484D'}, {id:'t_go', t:'下去', bg:'#14B8A6'},
+  {id:'t_broke', t:'吃土', bg:'#A16207'}
+];
+const STK = Object.fromEntries(STICKERS.map(s=>[s.id,s]));
+const stkName = s => s.name || s.t;
+const REACTIONS = ['💎','❤️','😂','🔥'];
+
+/* =========================================================
+   小工具
+   ========================================================= */
+const $ = (s,r=document)=>r.querySelector(s);
+function el(tag, attrs, ...kids){
+  const e=document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs||{})){
+    if(v==null||v===false) continue;
+    if(k==='class') e.className=v;
+    else if(k==='text') e.textContent=v;
+    else if(k==='style') e.style.cssText=v;
+    else if(k==='value') e.value=v;
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2),v);
+    else e.setAttribute(k, v===true?'':v);
+  }
+  for(const k of kids.flat()){ if(k==null||k===false) continue; e.append(k.nodeType?k:document.createTextNode(String(k))); }
+  return e;
+}
+const sleep = ms=>new Promise(r=>setTimeout(r,ms));
+const rand = n=>Math.floor(Math.random()*n);
+const todayStr = ()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();};
+function ago(ts){
+  const m=Math.max(0,Math.floor((Date.now()-ts)/60000));
+  if(m<1) return '剛剛'; if(m<60) return m+' 分鐘前';
+  return Math.floor(m/60)+' 小時前';
+}
+function left(ts){ const h=Math.max(0,Math.ceil((ts-Date.now())/3600000)); return '剩 '+h+' 小時'; }
+const DOTS_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+
+/* =========================================================
+   狀態（本機 + 雲端）
+   ========================================================= */
+const LS_KEY='picminer.v2';
+function randPiece(){ const k=Object.keys(SHAPES); return {shape:k[rand(k.length)], gem:rand(6)}; }
+function newPieces(){ return [randPiece(),randPiece(),randPiece()]; }
+function freshGame(){ return {grid:Array(64).fill(null), pieces:newPieces(), score:0, tokensAwarded:0, helperAvail:false, mining:0, over:false}; }
+function defaultState(){ return {tokens:0, uploads:0, filters:{}, seen:{}, stickers:{}, seenStk:{}, highScore:0, daily:{date:'',n:0}, active:null, game:freshGame(), at:0}; }
+function normalize(s){
+  const d=defaultState(); s=Object.assign(d, (s&&typeof s==='object')?s:{});
+  const g=s.game;
+  if(!g||!Array.isArray(g.grid)||g.grid.length!==64||!Array.isArray(g.pieces)||g.pieces.length!==3) s.game=freshGame();
+  for(const k of ['filters','seen','stickers','seenStk']) if(!s[k]||typeof s[k]!=='object') s[k]={};
+  if(!s.daily) s.daily={date:'',n:0};
+  if(s.active && !F[s.active]) s.active=null;
+  return s;
+}
+function loadLocal(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ return null; } }
+let S = normalize(loadLocal());
+
+const Cloud = { db:null, user:null, id:null, me:null, profile:null, writable:true, ready:false };
+let saveTimer=null, stateQ=Promise.resolve();
+function save(){
+  S.at=Date.now();
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+  clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud, 1200);
+}
+function pushCloud(){
+  if(!Cloud.db||!Cloud.id||!Cloud.writable) return;
+  const body={s:JSON.parse(JSON.stringify(S))};
+  stateQ=stateQ.then(()=>Cloud.db.doc('data/users/'+Cloud.id+'/state').set(body)).catch(writeErr);
+  if(Cloud.profile && S.highScore>(Cloud.profile.highScore||0)) writeProfile({highScore:S.highScore});
+}
+function writeErr(e){
+  if(e&&(e.code==='invalid_argument'||e.code==='permission-denied')){ Cloud.writable=false; renderFriends(true); }
+  else if(e&&e.code==='quota_exceeded'){ toast('雲端空間已滿，請刪掉一些舊貼文'); }
+}
+let profileQ=Promise.resolve();
+function writeProfile(patch){
+  if(!Cloud.db||!Cloud.writable) return Promise.resolve();
+  Cloud.profile=Object.assign({}, Cloud.profile||{}, patch, {at:Date.now()});
+  const body=Object.assign({}, Cloud.profile);
+  profileQ=profileQ.then(()=>Cloud.db.doc('profiles/'+Cloud.id).set(body)).catch(writeErr);
+  return profileQ;
+}
+
+/* =========================================================
+   Toast / Sheet
+   ========================================================= */
+function toast(text, opts={}){
+  const t=el('div',{class:'toast'+(opts.tier?' tiered':''), style:opts.tier?'--tc:'+TIERS[opts.tier].color:null});
+  if(opts.filter) t.append(filterThumb(opts.filter, 80, 100));
+  if(opts.sticker) t.append(el('img',{src:stickerURL(opts.sticker),alt:''}));
+  t.append(el('div',null, opts.title?el('div',{class:'tt',text:opts.title}):null, el('div',{text})));
+  const box=$('#toasts'); box.append(t);
+  while(box.children.length>2) box.firstElementChild.remove();
+  const kill=()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),260); };
+  t.addEventListener('click',kill);
+  setTimeout(kill, opts.ms||2600);
+}
+let sheetResolve=null, sheetCleanup=null;
+function openSheet(...nodes){
+  if(sheetResolve){ const r=sheetResolve; sheetResolve=null; r(null); }
+  const sh=$('#sheet'); sh.replaceChildren(el('div',{class:'grab'}), ...nodes); sh.scrollTop=0;
+  $('#sheetWrap').classList.add('open');
+  return new Promise(r=>{ sheetResolve=r; });
+}
+function closeSheet(v){
+  $('#sheetWrap').classList.remove('open'); delete $('#sheet').dataset.locked;
+  if(sheetCleanup){ sheetCleanup(); sheetCleanup=null; }
+  const r=sheetResolve; sheetResolve=null; r&&r(v);
+}
+$('#sheetWrap').addEventListener('click',e=>{ if(e.target.id==='sheetWrap' && !$('#sheet').dataset.locked) closeSheet(null); });
+function confirmSheet(title, text, okText='確定', cancelText='取消'){
+  return openSheet(el('h2',{text:title}), el('p',{text}),
+    el('div',{class:'actions'}, el('button',{class:'btn ghosty',text:cancelText,onclick:()=>closeSheet(false)}), el('button',{class:'btn',text:okText,onclick:()=>closeSheet(true)})));
+}
+
+/* =========================================================
+   濾鏡
+   ========================================================= */
+const _tmp={};
+function tmp(w,h,key){
+  let t=_tmp[key]; if(!t){ const cv=document.createElement('canvas'); t=_tmp[key]={cv,ctx:cv.getContext('2d',{willReadFrequently:true})}; }
+  w=Math.max(1,Math.round(w)); h=Math.max(1,Math.round(h));
+  if(t.cv.width!==w||t.cv.height!==h){ t.cv.width=w; t.cv.height=h; }
+  return {cv:t.cv, ctx:t.ctx, w, h};
+}
+function px(ctx,w,h,fn){ const im=ctx.getImageData(0,0,w,h), d=im.data; fn(d); ctx.putImageData(im,0,0); }
+function glow(ctx,w,h,alpha,scale,op){
+  const s=tmp(w*scale,h*scale,'glow'); s.ctx.clearRect(0,0,s.w,s.h); s.ctx.drawImage(ctx.canvas,0,0,s.w,s.h);
+  ctx.save(); ctx.globalAlpha=alpha; if(op) ctx.globalCompositeOperation=op; ctx.imageSmoothingEnabled=true; ctx.drawImage(s.cv,0,0,w,h); ctx.restore();
+}
+function vignette(ctx,w,h,a){
+  const g=ctx.createRadialGradient(w/2,h/2,Math.min(w,h)*.3,w/2,h/2,Math.max(w,h)*.75);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,'+a+')'); ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+}
+const clamp=v=>v<0?0:v>255?255:v;
+function applyFilter(ctx,w,h,id,t){
+  t=t||0;
+  switch(id){
+    case 'mono': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){const l=d[i]*.3+d[i+1]*.59+d[i+2]*.11;d[i]=d[i+1]=d[i+2]=l;}}); break;
+    case 'soft': glow(ctx,w,h,.55,.1); break;
+    case 'sepia': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2];d[i]=clamp(r*.393+g*.769+b*.189);d[i+1]=clamp(r*.349+g*.686+b*.168);d[i+2]=clamp(r*.272+g*.534+b*.131);}}); vignette(ctx,w,h,.35); break;
+    case 'warm': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){d[i]=clamp(d[i]*1.08+14);d[i+1]=clamp(d[i+1]*1.02+4);d[i+2]=clamp(d[i+2]*.82);}}); break;
+    case 'cool': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){d[i]=clamp(d[i]*.86);d[i+1]=clamp(d[i+1]+4);d[i+2]=clamp(d[i+2]*1.1+16);}}); break;
+    case 'film': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){const n=(Math.random()-.5)*34;d[i]=clamp(d[i]*.82+34+n);d[i+1]=clamp(d[i+1]*.8+28+n);d[i+2]=clamp(d[i+2]*.74+30+n);}}); vignette(ctx,w,h,.4); break;
+    case 'neon': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){const l=d[i]*.3+d[i+1]*.59+d[i+2]*.11;for(let k=0;k<3;k++){let v=l+(d[i+k]-l)*2.1;v=(v-128)*1.25+128;d[i+k]=clamp(v);}}});
+      { const g=ctx.createLinearGradient(0,0,w,h); g.addColorStop(0,'rgba(255,0,170,.35)'); g.addColorStop(1,'rgba(0,220,255,.35)'); ctx.save(); ctx.globalCompositeOperation='screen'; ctx.fillStyle=g; ctx.fillRect(0,0,w,h); ctx.restore(); } break;
+    case 'pixel': { const s=tmp(w/14,h/14,'pix'); s.ctx.imageSmoothingEnabled=true; s.ctx.drawImage(ctx.canvas,0,0,s.w,s.h); ctx.save(); ctx.imageSmoothingEnabled=false; ctx.drawImage(s.cv,0,0,w,h); ctx.restore(); } break;
+    case 'dream': glow(ctx,w,h,.5,.08,'screen'); ctx.save(); ctx.globalCompositeOperation='screen'; ctx.fillStyle='rgba(255,150,200,.28)'; ctx.fillRect(0,0,w,h); ctx.restore(); break;
+    case 'pride': { const cols=['#FF0000','#FFA500','#FFFF00','#00C000','#0050FF','#B000FF']; const sh=h/6; ctx.save(); ctx.globalAlpha=.3; cols.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(0,i*sh,w,sh+1);}); ctx.restore(); } break;
+    case 'poster': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){const l=d[i]*.3+d[i+1]*.59+d[i+2]*.11;for(let k=0;k<3;k++){let v=l+(d[i+k]-l)*1.6;v=Math.round(clamp(v)/255*3)/3*255;d[i+k]=v;}}}); break;
+    case 'stardust': {
+      px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){d[i]=clamp(d[i]*1.04+6);d[i+2]=clamp(d[i+2]*1.06+8);}});
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      const u=Math.min(w,h);
+      for(let k=0;k<26;k++){
+        const sx=((Math.sin(k*12.9898)*43758.5453)%1+1)%1*w, sy=((Math.sin(k*78.233)*12345.678)%1+1)%1*h;
+        const tw=.5+.5*Math.sin(t/300+k*1.7), r=u*(.012+.03*((k*7)%5)/5)*(.4+.6*tw);
+        ctx.fillStyle='rgba(255,240,200,'+(.35+.55*tw)+')';
+        ctx.beginPath(); ctx.moveTo(sx,sy-r*2.2); ctx.quadraticCurveTo(sx,sy,sx+r*2.2,sy); ctx.quadraticCurveTo(sx,sy,sx,sy+r*2.2); ctx.quadraticCurveTo(sx,sy,sx-r*2.2,sy); ctx.quadraticCurveTo(sx,sy,sx,sy-r*2.2); ctx.fill();
+      }
+      ctx.restore(); } break;
+    case 'gold': px(ctx,w,h,d=>{for(let i=0;i<d.length;i+=4){let l=(d[i]*.3+d[i+1]*.59+d[i+2]*.11)/255;l=l*l*(3-2*l);d[i]=42+(255-42)*l;d[i+1]=22+(224-22)*l;d[i+2]=6+(138-6)*l;}}); vignette(ctx,w,h,.45); break;
+    case 'kaleido': {
+      const s=tmp(w,h,'kal'); s.ctx.drawImage(ctx.canvas,0,0);
+      const hw=w/2, hh=h/2, sx=w/4, sy=h/4;
+      ctx.save(); ctx.drawImage(s.cv,sx,sy,hw,hh,0,0,hw,hh);
+      ctx.translate(w,0); ctx.scale(-1,1); ctx.drawImage(s.cv,sx,sy,hw,hh,0,0,hw,hh); ctx.restore();
+      ctx.save(); ctx.translate(0,h); ctx.scale(1,-1); ctx.drawImage(s.cv,sx,sy,hw,hh,0,0,hw,hh); ctx.restore();
+      ctx.save(); ctx.translate(w,h); ctx.scale(-1,-1); ctx.drawImage(s.cv,sx,sy,hw,hh,0,0,hw,hh); ctx.restore();
+    } break;
+  }
+}
+function drawSample(ctx,w,h){
+  const g=ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,'#6FA8EE'); g.addColorStop(.6,'#F5C49A'); g.addColorStop(1,'#E8907A');
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle='#FFE7A3'; ctx.beginPath(); ctx.arc(w*.7,h*.32,w*.14,0,7); ctx.fill();
+  ctx.fillStyle='#4E3C78'; ctx.beginPath(); ctx.moveTo(0,h*.78); ctx.lineTo(w*.35,h*.5); ctx.lineTo(w*.62,h*.74); ctx.lineTo(w*.82,h*.58); ctx.lineTo(w,h*.7); ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.fill();
+  ctx.fillStyle='#2E9E6B'; ctx.fillRect(0,h*.86,w,h*.14);
+  ctx.fillStyle='#E5484D'; ctx.beginPath(); ctx.moveTo(w*.22,h*.78); ctx.lineTo(w*.3,h*.7); ctx.lineTo(w*.38,h*.78); ctx.lineTo(w*.3,h*.9); ctx.fill();
+}
+function filterThumb(id,w,h){
+  const cv=el('canvas',{width:w,height:h}); const ctx=cv.getContext('2d',{willReadFrequently:true});
+  drawSample(ctx,w,h); if(id) applyFilter(ctx,w,h,id,0); return cv;
+}
+
+/* =========================================================
+   貼紙（畫成帶白邊的圖片，預覽和合成用同一張）
+   ========================================================= */
+const stkCache={}, stkUrlCache={};
+function rrect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function stickerCanvas(id){
+  if(stkCache[id]) return stkCache[id];
+  const s=STK[id]; const cv=document.createElement('canvas'); const ctx=cv.getContext('2d');
+  if(s.e){
+    cv.width=cv.height=220;
+    const t=document.createElement('canvas'); t.width=t.height=220; const tc=t.getContext('2d');
+    tc.font='150px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; tc.textAlign='center'; tc.textBaseline='middle';
+    tc.fillText(s.e,110,118);
+    const w=document.createElement('canvas'); w.width=w.height=220; const wc=w.getContext('2d');
+    wc.drawImage(t,0,0); wc.globalCompositeOperation='source-in'; wc.fillStyle='#fff'; wc.fillRect(0,0,220,220);
+    ctx.save(); ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=10; ctx.shadowOffsetY=4;
+    for(let a=0;a<16;a++){ ctx.drawImage(w,Math.cos(a/16*Math.PI*2)*8,Math.sin(a/16*Math.PI*2)*8); }
+    ctx.restore(); ctx.drawImage(t,0,0);
+  } else {
+    const font='900 88px "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+    ctx.font=font; const tw=ctx.measureText(s.t).width;
+    cv.width=Math.ceil(tw+96); cv.height=176;
+    ctx.font=font; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.save(); ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=10; ctx.shadowOffsetY=5;
+    rrect(ctx,10,14,cv.width-20,cv.height-30,40); ctx.fillStyle='#fff'; ctx.fill(); ctx.restore();
+    rrect(ctx,20,24,cv.width-40,cv.height-50,32); ctx.fillStyle=s.bg; ctx.fill();
+    ctx.lineJoin='round'; ctx.lineWidth=12; ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.strokeText(s.t,cv.width/2,cv.height/2);
+    ctx.fillStyle=s.fg||'#fff'; ctx.fillText(s.t,cv.width/2,cv.height/2);
+  }
+  stkCache[id]=cv; return cv;
+}
+function stickerURL(id){ return stkUrlCache[id]||(stkUrlCache[id]=stickerCanvas(id).toDataURL('image/png')); }
+const stkBaseFrac = id => { const c=stickerCanvas(id); return c.height===220 ? .28 : .17*c.width/c.height; };
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{ for(const k in stkCache) if(!STK[k].e){ delete stkCache[k]; delete stkUrlCache[k]; } renderBag(); });
+
+/* =========================================================
+   遊戲
+   ========================================================= */
+const G=()=>S.game;
+const boardEl=$('#board'), cellEls=[];
+for(let i=0;i<64;i++){ const d=el('div',{class:'cell'}); boardEl.append(d); cellEls.push(d); }
+let busy=false, drag=null;
+
+const shattering=new Map(); // 正在播碎裂動畫的格子（邏輯上已清空，可以馬上再放）
+function renderBoard(){
+  const g=G().grid;
+  for(let i=0;i<64;i++){
+    const v=g[i], e=cellEls[i];
+    if(v==null&&shattering.has(i)){ e.className='cell shatter'; e.style.setProperty('--g',shattering.get(i)); continue; }
+    e.className = v==null ? 'cell' : 'cell gem';
+    if(v==null) e.style.removeProperty('--g'); else e.style.setProperty('--g', GEM_COLORS[v]);
+  }
+}
+function pieceNode(shape, gem, size, gap){
+  const cells=SHAPES[shape]; const rs=cells.map(c=>c[0]), cs=cells.map(c=>c[1]);
+  const h=Math.max(...rs)+1, w=Math.max(...cs)+1;
+  const wrap=el('div',{class:'piece', style:`width:${w*size-gap}px;height:${h*size-gap}px`});
+  for(const [r,c] of cells){ wrap.append(el('div',{class:'pc', style:`--g:${GEM_COLORS[gem]};left:${c*size}px;top:${r*size}px;width:${size-gap}px;height:${size-gap}px`})); }
+  return wrap;
+}
+function canPlace(cells,r0,c0,grid){
+  for(const [dr,dc] of cells){ const r=r0+dr,c=c0+dc; if(r<0||r>7||c<0||c>7||grid[r*8+c]!=null) return false; } return true;
+}
+function anyFit(cells,grid){ for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(canPlace(cells,r,c,grid)) return true; return false; }
+function fullLines(grid){
+  const rows=[],cols=[];
+  for(let r=0;r<8;r++){ let f=true; for(let c=0;c<8;c++) if(grid[r*8+c]==null){f=false;break;} if(f) rows.push(r); }
+  for(let c=0;c<8;c++){ let f=true; for(let r=0;r<8;r++) if(grid[r*8+c]==null){f=false;break;} if(f) cols.push(c); }
+  return {rows,cols};
+}
+function clearCount(cells,grid){
+  let best=0;
+  for(let r0=0;r0<8;r0++) for(let c0=0;c0<8;c0++){
+    if(!canPlace(cells,r0,c0,grid)) continue;
+    const g=grid.slice(); for(const [dr,dc] of cells) g[(r0+dr)*8+c0+dc]=1;
+    const {rows,cols}=fullLines(g); const set=new Set(); rows.forEach(r=>{for(let c=0;c<8;c++)set.add(r*8+c);}); cols.forEach(c=>{for(let r=0;r<8;r++)set.add(r*8+c);});
+    if(set.size>best) best=set.size;
+  }
+  return best;
+}
+function helperShape(){
+  let best=null, bs=-1;
+  for(const k of Object.keys(SHAPES)){ const s=clearCount(SHAPES[k],G().grid); if(s>bs){bs=s;best=k;} }
+  return best;
+}
+let helperCache=null;
+let trayDirty=false;
+function renderTray(){
+  if(drag){ trayDirty=true; return; } // 拖曳中不重畫，避免手指下的元素被換掉
+  const tray=$('#tray'); tray.replaceChildren();
+  const slotW=Math.min(tray.clientWidth||340, 400); const size=Math.floor(((slotW-24)/4)*0.86/4);
+  G().pieces.forEach((p,i)=>{
+    const s=el('div',{class:'slot','aria-label':'礦石 '+(i+1)});
+    if(p){ s.append(pieceNode(p.shape,p.gem,size,2)); s.addEventListener('pointerdown',e=>startDrag(e,'slot',i,s)); }
+    tray.append(s);
+  });
+  helperCache=helperShape();
+  const h=el('div',{class:'slot helper'+(G().helperAvail?' ready':''),'aria-label':'幫手礦石'});
+  if(helperCache) h.append(pieceNode(helperCache,HELPER_GEM,size,2));
+  h.append(el('div',{class:'slot-label',text:G().helperAvail?'幫手可用':'幫手'}));
+  h.addEventListener('pointerdown',e=>{
+    if(!G().helperAvail){ toast('消除方塊時有機會挖到幫手，挖到後就能用這塊最適合清盤的形狀'); return; }
+    startDrag(e,'helper',null,h);
+  });
+  tray.append(h);
+}
+function renderScore(){
+  const g=G();
+  $('#score').textContent=g.score; $('#best').textContent=S.highScore;
+  const today=todayStr(); const n=S.daily.date===today?S.daily.n:0;
+  $('#dailyLabel').textContent='今日 '+n+'/'+DAILY_TOKEN_CAP;
+  const into=g.score%TARGET_SCORE;
+  $('#bar').style.width=(n>=DAILY_TOKEN_CAP?100:into/TARGET_SCORE*100)+'%';
+  $('#nextLabel').textContent = n>=DAILY_TOKEN_CAP ? '今天的拍照機會已領完' : '再 '+(TARGET_SCORE-into)+' 分拿拍照機會';
+}
+function renderGameOver(){
+  const old=$('#gameover'); if(old) old.remove();
+  if(!G().over) return;
+  $('#boardWrap').append(el('div',{class:'gameover',id:'gameover'},
+    el('h3',{text:'礦坑塞滿了'}), el('div',{class:'num',text:G().score}),
+    el('div',{style:'color:#cfc3e6;font-size:13px',text:'最高分 '+S.highScore}),
+    el('button',{class:'btn gold',style:'margin-top:10px',text:'再挖一局',onclick:()=>{ S.game=freshGame(); save(); renderGame(); }})));
+}
+function renderGame(){ renderBoard(); renderTray(); renderScore(); renderGameOver(); renderChips(); }
+
+function metrics(){
+  const a=cellEls[0].getBoundingClientRect(), b=cellEls[1].getBoundingClientRect();
+  return {left:a.left, top:a.top, pitch:b.left-a.left, cell:a.width};
+}
+function startDrag(e,source,idx,slotEl){
+  if(drag) cancelDrag();
+  if(busy||G().over) return;
+  const p = source==='helper' ? {shape:helperCache,gem:HELPER_GEM} : G().pieces[idx];
+  if(!p||!p.shape) return;
+  e.preventDefault();
+  const m=metrics(); const gap=m.pitch-m.cell;
+  const ghost=pieceNode(p.shape,p.gem,m.pitch,gap); ghost.classList.add('ghost');
+  document.body.append(ghost);
+  const cells=SHAPES[p.shape];
+  const w=(Math.max(...cells.map(c=>c[1]))+1)*m.pitch, h=(Math.max(...cells.map(c=>c[0]))+1)*m.pitch;
+  drag={source,idx,p,cells,ghost,m,w,h,slotEl,r:null,c:null,pid:e.pointerId};
+  slotEl.classList.add('lifting');
+  moveDrag(e);
+}
+function cancelDrag(){
+  const d=drag; if(!d) return; drag=null;
+  d.ghost.remove(); d.slotEl.classList.remove('lifting'); clearHints(); renderBoard();
+  if(trayDirty){ trayDirty=false; renderTray(); }
+}
+function clearHints(){ cellEls.forEach(c=>c.classList.remove('hint','bad','willclear')); }
+function moveDrag(e){
+  const d=drag; d.m=metrics();
+  const lift = e.pointerType==='mouse' ? 0 : 36;
+  const x=e.clientX-d.w/2, y=e.clientY-d.h-lift;
+  d.ghost.style.transform=`translate(${x}px,${y}px)`;
+  const c=Math.round((x-d.m.left)/d.m.pitch), r=Math.round((y-d.m.top)/d.m.pitch);
+  if(r===d.r&&c===d.c) return;
+  d.r=r; d.c=c; clearHints(); renderBoard();
+  const grid=G().grid;
+  const inside=d.cells.some(([dr,dc])=>r+dr>=0&&r+dr<8&&c+dc>=0&&c+dc<8);
+  if(!inside) return;
+  const ok=canPlace(d.cells,r,c,grid);
+  for(const [dr,dc] of d.cells){
+    const rr=r+dr, cc=c+dc; if(rr<0||rr>7||cc<0||cc>7) continue;
+    const ce=cellEls[rr*8+cc];
+    if(grid[rr*8+cc]==null){ ce.classList.add('hint'); ce.style.setProperty('--g',GEM_COLORS[d.p.gem]); if(!ok) ce.classList.add('bad'); }
+  }
+  if(ok){
+    const g=grid.slice(); for(const [dr,dc] of d.cells) g[(r+dr)*8+c+dc]=1;
+    const {rows,cols}=fullLines(g);
+    rows.forEach(rr=>{for(let cc=0;cc<8;cc++)cellEls[rr*8+cc].classList.add('willclear');});
+    cols.forEach(cc=>{for(let rr=0;rr<8;rr++)cellEls[rr*8+cc].classList.add('willclear');});
+  }
+}
+function endDrag(){
+  const d=drag; if(!d) return; drag=null;
+  d.ghost.remove(); d.slotEl.classList.remove('lifting'); clearHints(); renderBoard();
+  if(trayDirty){ trayDirty=false; renderTray(); }
+  if(d.r!=null && canPlace(d.cells,d.r,d.c,G().grid)) commitPlace(d.p,d.r,d.c,d.source,d.idx);
+}
+window.addEventListener('pointermove',e=>{ if(drag&&e.pointerId===drag.pid){ e.preventDefault(); moveDrag(e); } },{passive:false});
+window.addEventListener('pointerup',e=>{ if(drag&&e.pointerId===drag.pid) endDrag(); });
+window.addEventListener('pointercancel',e=>{ if(drag&&e.pointerId===drag.pid) cancelDrag(); });
+// 保險：手機有時候收不到 pointerup，手指離開螢幕時也結束拖曳
+window.addEventListener('touchend',e=>{ if(drag&&e.touches.length===0) setTimeout(()=>{ if(drag) endDrag(); },0); });
+window.addEventListener('touchcancel',()=>{ if(drag) cancelDrag(); });
+
+function floatText(text, xPct, yPct, color){
+  const f=el('div',{class:'floater',text,style:`left:${xPct}%;top:${yPct}%;color:${color||'#fff'}`});
+  $('#boardWrap').append(f); setTimeout(()=>f.remove(),950);
+}
+// 消除特效：整行發光 + 依行數升級的字和特效
+function clearFx(rows, cols){
+  const n=Math.min(4, rows.length+cols.length); const fx=COMBOS[n]; const wrap=$('#boardWrap'); const wr=wrap.getBoundingClientRect();
+  const beam=(a,b,dir)=>{
+    const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+    const d=el('div',{class:'beam '+dir,style:`--bc:${fx.color};left:${ra.left-wr.left-5}px;top:${ra.top-wr.top-5}px;width:${rb.right-ra.left+10}px;height:${rb.bottom-ra.top+10}px`});
+    wrap.append(d); setTimeout(()=>d.remove(),800);
+  };
+  rows.forEach(r=>beam(cellEls[r*8],cellEls[r*8+7],'h'));
+  cols.forEach(c=>beam(cellEls[c],cellEls[56+c],'v'));
+  const fs=Math.min(fx.size, wr.width/(fx.text.length*0.58));
+  const t=el('div',{class:'combo'+(fx.rainbow?' rainbow':''),text:fx.text,style:`--cc:${fx.color};font-size:${fs}px`});
+  wrap.append(t); setTimeout(()=>t.remove(),1700);
+  if(fx.flash){ const f=el('div',{class:'bflash'}); wrap.append(f); setTimeout(()=>f.remove(),750); }
+  if(fx.shake){ wrap.style.setProperty('--a',fx.shake+'px'); wrap.classList.remove('shake'); void wrap.offsetWidth; wrap.classList.add('shake'); setTimeout(()=>wrap.classList.remove('shake'),500); }
+  const palette=fx.rainbow?['#ff4d6d','#ffb84d','#fff35c','#4dff9a','#4dc3ff','#b84dff']:[fx.color,'#fff',fx.color];
+  for(let i=0;i<fx.sparks;i++){
+    const a=Math.random()*Math.PI*2, dist=60+Math.random()*wr.width*.45;
+    const s=el('div',{class:'spark',style:`--pc:${palette[i%palette.length]};--dx:${Math.cos(a)*dist}px;--dy:${Math.sin(a)*dist}px;--rot:${rand(720)}deg;animation-delay:${Math.random()*.12}s`});
+    wrap.append(s); setTimeout(()=>s.remove(),1200);
+  }
+  if(n>=2&&navigator.vibrate){ try{ navigator.vibrate(n>=3?[30,40,60]:30); }catch(e){} }
+}
+async function sha256byte(str){
+  try{ const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)); return new Uint8Array(buf)[0]; }
+  catch(e){ return rand(256); }
+}
+async function mine(attempts){
+  const g=G();
+  for(let i=0;i<attempts;i++){
+    if(g.helperAvail) return false;
+    g.mining++;
+    const v=await sha256byte(g.score+'|'+g.mining+'|'+Date.now()+'|'+Math.random());
+    if(v<HELPER_HIT){ g.helperAvail=true; toast('下方的幫手礦石可以用一次了',{title:'挖到幫手'}); return true; }
+  }
+  return false;
+}
+function rollFilter(){
+  const total=Object.values(TIERS).reduce((a,t)=>a+t.w,0); let x=Math.random()*total, tier='common';
+  for(const [k,t] of Object.entries(TIERS)){ if(x<t.w){tier=k;break;} x-=t.w; }
+  const pool=FILTERS.filter(f=>f.tier===tier); return pool[rand(pool.length)];
+}
+function randomEvent(xPct,yPct){
+  const roll=Math.random(), g=G(); let acc=DROP.gem;
+  if(roll<acc){ g.score+=150; floatText('+150 稀有寶石',xPct,yPct,'#FFD36B'); return; }
+  acc+=DROP.filter;
+  if(roll<acc){
+    const f=rollFilter(); S.filters[f.id]=(S.filters[f.id]||0)+1; S.seen[f.id]=true;
+    toast(TIERS[f.tier].name+'濾鏡，拍照時可以套用一次',{title:'挖到「'+f.name+'」濾鏡',tier:f.tier,filter:f.id,ms:3400});
+    if(currentTab==='bag') renderBag(); return;
+  }
+  acc+=DROP.sticker;
+  if(roll<acc){
+    const s=STICKERS[rand(STICKERS.length)]; S.stickers[s.id]=(S.stickers[s.id]||0)+1; S.seenStk[s.id]=true;
+    toast('拍完照可以貼在照片上',{title:'挖到「'+stkName(s)+'」貼紙',sticker:s.id,ms:3200}); if(currentTab==='bag') renderBag(); return;
+  }
+  acc+=DROP.upload;
+  if(roll<acc){ S.uploads++; toast('可以直接從相簿挑一張照片發到好友動態',{title:'挖到夢幻礦石',tier:'epic',ms:3200}); }
+}
+function checkTokens(){
+  const g=G(), today=todayStr();
+  if(S.daily.date!==today) S.daily={date:today,n:0};
+  const diff=Math.floor(g.score/TARGET_SCORE)-g.tokensAwarded;
+  if(diff<=0) return;
+  const avail=DAILY_TOKEN_CAP-S.daily.n; if(avail<=0) return;
+  const give=Math.min(diff,avail);
+  S.tokens+=give; g.tokensAwarded+=give; S.daily.n+=give;
+  toast('今日已領 '+S.daily.n+'/'+DAILY_TOKEN_CAP,{title:'拍照機會 +'+give});
+}
+async function commitPlace(p,r0,c0,source,idx){
+  busy=true;
+  // 不管中間出什麼錯，都一定解除鎖定，遊戲不會卡死
+  try{ await doPlace(p,r0,c0,source,idx); }
+  catch(err){ console.error(err); try{ renderGame(); }catch(e2){} }
+  finally{ busy=false; }
+}
+async function doPlace(p,r0,c0,source,idx){
+  const g=G(), cells=SHAPES[p.shape];
+  for(const [dr,dc] of cells) g.grid[(r0+dr)*8+c0+dc]=p.gem;
+  g.score+=cells.length*10;
+  if(source==='slot') g.pieces[idx]=null; else g.helperAvail=false;
+  renderBoard(); renderScore();
+  const {rows,cols}=fullLines(g.grid);
+  if(rows.length||cols.length){
+    const set=new Set();
+    rows.forEach(r=>{for(let c=0;c<8;c++)set.add(r*8+c);}); cols.forEach(c=>{for(let r=0;r<8;r++)set.add(r*8+c);});
+    // 盤面立刻清空（不擋下一手），碎裂動畫另外播
+    set.forEach(i=>{ shattering.set(i,GEM_COLORS[g.grid[i]]); g.grid[i]=null; });
+    g.score+=100*(rows.length+cols.length);
+    renderBoard(); clearFx(rows,cols); renderScore();
+    setTimeout(()=>{ set.forEach(i=>{ shattering.delete(i); cellEls[i].classList.remove('shatter'); }); },470);
+    mine(set.size).then(found=>{
+      if(!found) return;
+      const g2=G(); helperCache=helperShape();
+      if(g2.over&&helperCache&&anyFit(SHAPES[helperCache],g2.grid)) g2.over=false;
+      save();
+      const later=()=>{ if(drag) setTimeout(later,200); else renderGame(); }; later();
+    });
+  }
+  const cx=cells.reduce((a,c)=>a+c0+c[1]+.5,0)/cells.length*12.5, cy=cells.reduce((a,c)=>a+r0+c[0]+.5,0)/cells.length*12.5;
+  randomEvent(cx,cy);
+  checkTokens();
+  if(g.pieces.every(x=>!x)) g.pieces=newPieces();
+  if(g.score>S.highScore) S.highScore=g.score;
+  const fits=g.pieces.some(x=>x&&anyFit(SHAPES[x.shape],g.grid));
+  helperCache=helperShape();
+  const helperFits=g.helperAvail&&helperCache&&anyFit(SHAPES[helperCache],g.grid);
+  if(!fits&&!helperFits) g.over=true;
+  save(); renderGame();
+}
+$('#resetBtn').addEventListener('click',async()=>{
+  if(G().score>0&&!G().over){ if(!await confirmSheet('重新開始？','目前這局的分數會歸零，已拿到的道具會保留。','重新開始')) return; }
+  S.game=freshGame(); save(); renderGame();
+});
+
+/* =========================================================
+   相機
+   ========================================================= */
+const video=$('#video'), pv=$('#preview'), pctx=pv.getContext('2d',{willReadFrequently:true});
+const Cam={stream:null, track:null, facing:'environment', torchOK:false, flash:false, zoom:1, raf:0, live:false};
+function showNativeFallback(){
+  $('#camFallback').style.display='flex';
+  $('#camFallbackTitle').textContent='用手機相機拍照';
+  $('#camFallbackText').textContent='點一下就會打開手機內建相機，拍完一樣可以套濾鏡、貼貼紙。';
+  $('#nativeShotBtn').style.display='inline-flex';
+}
+async function startCamera(){
+  stopCamera();
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ showNativeFallback(); return; }
+  $('#camFallback').style.display='flex'; $('#camFallbackTitle').textContent='正在開啟相機…'; $('#camFallbackText').textContent=''; $('#nativeShotBtn').style.display='none';
+  try{
+    Cam.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:Cam.facing},width:{ideal:1280},height:{ideal:960}},audio:false});
+  }catch(e){ showNativeFallback(); return; }
+  if(currentTab!=='camera'){ stopCamera(); return; }
+  video.srcObject=Cam.stream; try{ await video.play(); }catch(e){}
+  Cam.track=Cam.stream.getVideoTracks()[0];
+  const caps=(Cam.track.getCapabilities&&Cam.track.getCapabilities())||{};
+  Cam.torchOK=!!caps.torch;
+  if(!Cam.torchOK) Cam.flash=false;
+  $('#camFallback').style.display='none'; Cam.live=true;
+  if(Cam.flash) setTorch(true);
+  updateFlashUI(); loop();
+}
+function stopCamera(){
+  cancelAnimationFrame(Cam.raf); Cam.live=false;
+  if(Cam.track&&Cam.torchOK){ try{ Cam.track.applyConstraints({advanced:[{torch:false}]}); }catch(e){} }
+  if(Cam.stream) Cam.stream.getTracks().forEach(t=>t.stop());
+  Cam.stream=null; Cam.track=null;
+}
+async function setTorch(on){
+  if(!Cam.track||!Cam.torchOK) return false;
+  try{ await Cam.track.applyConstraints({advanced:[{torch:on}]}); return true; }catch(e){ return false; }
+}
+function updateFlashUI(){
+  const b=$('#flashBtn'); b.setAttribute('aria-pressed',Cam.flash); b.classList.toggle('on',Cam.flash);
+  $('#flashLabel').textContent = Cam.flash ? '閃光燈 開' : '閃光燈 關';
+}
+$('#flashBtn').addEventListener('click',async()=>{
+  if(!Cam.torchOK){ Cam.flash=false; updateFlashUI(); toast(TORCH_FAIL_MSG); return; }
+  const next=!Cam.flash; const ok=await setTorch(next);
+  if(!ok){ Cam.flash=false; updateFlashUI(); toast(TORCH_FAIL_MSG); return; }
+  Cam.flash=next; updateFlashUI();
+});
+$('#flipBtn').addEventListener('click',()=>{ Cam.facing=Cam.facing==='user'?'environment':'user'; $('#nativeInput').setAttribute('capture',Cam.facing); startCamera(); });
+$('#zoomCtl').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; Cam.zoom=+b.dataset.z; [...$('#zoomCtl').children].forEach(x=>x.setAttribute('aria-pressed',x===b)); });
+function drawCover(ctx,w,h,src,sw,sh,mirror,zoom){
+  const sc=Math.max(w/sw,h/sh)*(zoom||1), dw=sw*sc, dh=sh*sc;
+  ctx.save(); if(mirror){ctx.translate(w,0);ctx.scale(-1,1);} ctx.drawImage(src,(w-dw)/2,(h-dh)/2,dw,dh); ctx.restore();
+}
+function activeFilter(){ return S.active && (S.filters[S.active]||0)>0 ? S.active : null; }
+function loop(t){
+  if(!Cam.live) return;
+  if(video.readyState>=2&&video.videoWidth){
+    drawCover(pctx,pv.width,pv.height,video,video.videoWidth,video.videoHeight,Cam.facing==='user',Cam.zoom);
+    const f=activeFilter(); if(f) applyFilter(pctx,pv.width,pv.height,f,t||0);
+  }
+  Cam.raf=requestAnimationFrame(loop);
+}
+function compress(cv){
+  let c=cv;
+  for(let pass=0;pass<4;pass++){
+    for(let q=.82;q>=.42;q-=.1){ const u=c.toDataURL('image/jpeg',q); if(u.length<190000) return u; }
+    const s=document.createElement('canvas'); s.width=Math.round(c.width*.75); s.height=Math.round(c.height*.75);
+    s.getContext('2d').drawImage(c,0,0,s.width,s.height); c=s;
+  }
+  return c.toDataURL('image/jpeg',.4);
+}
+function newPhotoCanvas(){ const cv=document.createElement('canvas'); cv.width=720; cv.height=960; return cv; }
+$('#shutter').addEventListener('click',()=>{
+  if(!Cam.live){ $('#nativeInput').click(); return; }
+  const cv=newPhotoCanvas(); const ctx=cv.getContext('2d',{willReadFrequently:true});
+  drawCover(ctx,720,960,video,video.videoWidth,video.videoHeight,Cam.facing==='user',Cam.zoom);
+  const f=activeFilter(); if(f) applyFilter(ctx,720,960,f,performance.now());
+  openEditor(cv, f, 'camera');
+});
+$('#camFallback').addEventListener('click',()=>{ if($('#nativeShotBtn').style.display!=='none') $('#nativeInput').click(); });
+function loadImageFile(file){
+  return new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const im=new Image(); im.onload=()=>{res(im);URL.revokeObjectURL(u);}; im.onerror=rej; im.src=u; });
+}
+$('#nativeInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; e.target.value=''; if(!file) return;
+  try{
+    const im=await loadImageFile(file);
+    const cv=newPhotoCanvas(); const ctx=cv.getContext('2d',{willReadFrequently:true});
+    drawCover(ctx,720,960,im,im.naturalWidth,im.naturalHeight,false,1);
+    const f=activeFilter(); if(f) applyFilter(ctx,720,960,f,0);
+    openEditor(cv, f, 'camera');
+  }catch(err){ toast('讀不到這張照片，換一張試試'); }
+});
+$('#albumBtn').addEventListener('click',()=>{
+  if(S.uploads<=0){ toast('挖到夢幻礦石（隨機掉落）就能從相簿挑照片發文',{title:'沒有相簿上傳券'}); return; }
+  $('#albumInput').click();
+});
+$('#albumInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; e.target.value=''; if(!file) return;
+  try{
+    const im=await loadImageFile(file);
+    const cv=newPhotoCanvas(); drawCover(cv.getContext('2d'),720,960,im,im.naturalWidth,im.naturalHeight,false,1);
+    openEditor(cv, null, 'album');
+  }catch(err){ toast('讀不到這張照片，換一張試試'); }
+});
+
+/* ---------- 照片編輯：貼紙 + 內文 ---------- */
+async function openEditor(base, filterId, kind){
+  const placed=[]; let sel=null;
+  const offline=!Cloud.db||!Cloud.writable;
+  const noToken= kind==='camera' ? S.tokens<=0 : S.uploads<=0;
+  const stage=el('div',{class:'editor'}, el('img',{class:'ed-base',src:base.toDataURL('image/jpeg',.9),alt:'照片預覽'}));
+  const tools=el('div',{class:'ed-tools'});
+  const tray=el('div',{class:'stk-tray'});
+  const caption=el('textarea',{maxlength:'200',placeholder:'寫點什麼…（可以不填）','aria-label':'貼文內文'});
+  const remaining=id=>(S.stickers[id]||0)-placed.filter(p=>p.id===id).length;
+
+  function layout(p){
+    const n=p.node; n.style.left=(p.x*100)+'%'; n.style.top=(p.y*100)+'%';
+    n.style.width=(stkBaseFrac(p.id)*p.s*100)+'%';
+    n.style.transform=`translate(-50%,-50%) rotate(${p.r}deg)`;
+  }
+  function select(p){
+    sel=p; placed.forEach(q=>q.node.classList.toggle('sel',q===p));
+    tools.replaceChildren();
+    if(!p) return;
+    const b=(t,fn)=>el('button',{class:'btn small ghosty',text:t,onclick:fn});
+    tools.append(
+      b('縮小',()=>{p.s=Math.max(.4,p.s/1.2);layout(p);}),
+      b('放大',()=>{p.s=Math.min(3.5,p.s*1.2);layout(p);}),
+      b('旋轉',()=>{p.r=(p.r+15)%360;layout(p);}),
+      b('拿掉',()=>{p.node.remove(); placed.splice(placed.indexOf(p),1); select(null); renderTray();}));
+  }
+  function renderTray(){
+    tray.replaceChildren();
+    const owned=STICKERS.filter(s=>(S.stickers[s.id]||0)>0);
+    if(!owned.length){ tray.append(el('div',{class:'muted',style:'padding:8px 0',text:'還沒有貼紙，挖礦時有機會挖到'})); return; }
+    owned.forEach(s=>{
+      const left=remaining(s.id);
+      tray.append(el('button',{class:'stk-btn','aria-label':stkName(s),disabled:left<=0||null,style:left<=0?'opacity:.35':null,onclick:()=>add(s.id)},
+        el('img',{src:stickerURL(s.id),alt:''}), el('span',{class:'cnt num',text:'×'+left})));
+    });
+  }
+  function add(id){
+    if(remaining(id)<=0) return;
+    const p={id,x:.5,y:.42+placed.length*.03,s:1,r:0};
+    p.node=el('img',{class:'stk',src:stickerURL(id),alt:stkName(STK[id]),draggable:'false'});
+    p.node.addEventListener('pointerdown',e=>down(e,p));
+    stage.append(p.node); placed.push(p); layout(p); select(p); renderTray();
+  }
+  // 拖曳（單指）＋ 縮放旋轉（雙指）
+  const pts=new Map(); let act=null;
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y), ang=(a,b)=>Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
+  function begin(p){
+    const v=[...pts.values()];
+    if(v.length===1) act={p,mode:'drag',sx:v[0].x,sy:v[0].y,ox:p.x,oy:p.y};
+    else if(v.length>=2) act={p,mode:'pinch',d0:dist(v[0],v[1]),a0:ang(v[0],v[1]),s0:p.s,r0:p.r};
+  }
+  function down(e,p){
+    e.preventDefault(); e.stopPropagation();
+    if(act&&act.p!==p) pts.clear();
+    select(p); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); begin(p);
+  }
+  const ac=new AbortController();
+  document.addEventListener('pointermove',e=>{
+    if(!pts.has(e.pointerId)||!act) return; e.preventDefault();
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const p=act.p, rect=stage.getBoundingClientRect(), v=[...pts.values()];
+    if(act.mode==='drag'&&v.length===1){
+      p.x=Math.min(1,Math.max(0,act.ox+(v[0].x-act.sx)/rect.width));
+      p.y=Math.min(1,Math.max(0,act.oy+(v[0].y-act.sy)/rect.height));
+    } else if(act.mode==='pinch'&&v.length>=2){
+      p.s=Math.min(3.5,Math.max(.4,act.s0*dist(v[0],v[1])/act.d0));
+      p.r=act.r0+ang(v[0],v[1])-act.a0;
+    }
+    layout(p);
+  },{passive:false,signal:ac.signal});
+  const up=e=>{ if(!pts.has(e.pointerId)) return; pts.delete(e.pointerId); if(act&&pts.size) begin(act.p); else act=null; };
+  document.addEventListener('pointerup',up,{signal:ac.signal});
+  document.addEventListener('pointercancel',up,{signal:ac.signal});
+  stage.addEventListener('pointerdown',e=>{ if(!e.target.classList.contains('stk')) select(null); });
+
+  const note = offline ? '登入後才能發佈到好友動態（到「好友」分頁登入）。' :
+    noToken ? (kind==='camera'?'目前沒有拍照機會，先去挖礦拿分數吧。照片可以先看，但不能發佈。':'沒有相簿上傳券了。') :
+    (kind==='camera' ? '發佈會用掉 1 次拍照機會'+(filterId?'和 1 次「'+F[filterId].name+'」濾鏡':'') : '發佈會用掉 1 張相簿上傳券') + '，用到的貼紙也會扣掉，24 小時後貼文自動消失。';
+  renderTray();
+  $('#sheet').dataset.locked='1';
+  sheetCleanup=()=>ac.abort();
+  const go=await openSheet(
+    stage, tools,
+    el('div',{class:'muted',style:'margin-top:4px',text:'點貼紙加到照片上，拖曳移動，兩指可以縮放旋轉'}),
+    tray,
+    el('label',{class:'field'}, el('span',{text:'內文'}), caption),
+    el('p',{text:note}),
+    el('div',{class:'actions'},
+      el('button',{class:'btn ghosty',text:kind==='camera'?'重拍':'取消',onclick:()=>closeSheet(false)}),
+      el('button',{class:'btn gold',text:'發佈到好友動態',disabled:(noToken||offline)||null,onclick:()=>closeSheet(true)})));
+  if(!go) return;
+
+  // 合成貼紙
+  const out=newPhotoCanvas(); const octx=out.getContext('2d');
+  octx.drawImage(base,0,0,720,960);
+  for(const p of placed){
+    const sc=stickerCanvas(p.id), w=stkBaseFrac(p.id)*p.s*720, h=w*sc.height/sc.width;
+    octx.save(); octx.translate(p.x*720,p.y*960); octx.rotate(p.r*Math.PI/180); octx.drawImage(sc,-w/2,-h/2,w,h); octx.restore();
+  }
+  const img=compress(out);
+  const used={}; placed.forEach(p=>used[p.id]=(used[p.id]||0)+1);
+  const spend=sign=>{
+    if(kind==='camera'){ S.tokens-=sign; if(filterId){ S.filters[filterId]=Math.max(0,(S.filters[filterId]||0)-sign); } } else S.uploads-=sign;
+    for(const k in used) S.stickers[k]=Math.max(0,(S.stickers[k]||0)-sign*used[k]);
+  };
+  if(kind==='camera'?S.tokens<=0:S.uploads<=0) return;
+  spend(1);
+  if(filterId&&!S.filters[filterId]&&S.active===filterId) S.active=null;
+  save(); renderChips(); renderBag(); renderFilterStrip();
+  const ok=await createPost(img, filterId, kind, caption.value.trim().slice(0,200));
+  if(ok) toast('朋友現在看得到了',{title:'已發佈'});
+  else { spend(-1); save(); renderChips(); renderBag(); renderFilterStrip(); toast('發佈失敗，道具已退回'); }
+}
+function renderFilterStrip(){
+  const strip=$('#filterStrip'); strip.replaceChildren();
+  const mk=(id,label,cnt)=>{
+    const b=el('button',{class:'fchip','aria-pressed':String((S.active||null)===id)}, filterThumb(id,52,52), el('span',{text:label}), cnt!=null?el('span',{class:'cnt num',text:'×'+cnt}):null);
+    b.addEventListener('click',()=>{ S.active=id; save(); renderFilterStrip(); renderBag(); });
+    return b;
+  };
+  strip.append(mk(null,'原圖',null));
+  FILTERS.forEach(f=>{ const n=S.filters[f.id]||0; if(n>0) strip.append(mk(f.id,f.name,n)); });
+  if(strip.children.length===1) strip.append(el('div',{style:'color:#a99cc0;align-self:center;font-size:13px',text:'挖礦時有機會挖到濾鏡'}));
+}
+
+/* =========================================================
+   背包
+   ========================================================= */
+function renderBag(){
+  const p=$('#bagPane'); if(!p) return;
+  const fTotal=Object.values(S.filters).reduce((a,b)=>a+b,0), sTotal=Object.values(S.stickers).reduce((a,b)=>a+b,0);
+  const grid=el('div',{class:'fgrid'});
+  FILTERS.forEach(f=>{
+    const n=S.filters[f.id]||0, seen=S.seen[f.id]||n>0;
+    const card=el('button',{class:'fcard'+(seen?'':' locked')+(S.active===f.id&&n>0?' equipped':''),'aria-label':f.name},
+      filterThumb(f.id,90,112), n>0?el('span',{class:'fc num',text:'×'+n}):null,
+      el('div',{class:'fn',text:seen?f.name:'尚未挖到'}), el('div',{class:'ft '+TIERS[f.tier].cls,text:TIERS[f.tier].name}));
+    card.addEventListener('click',()=>{
+      if(n<=0){ toast(seen?'這個濾鏡用完了，再去挖礦吧':'挖礦時有機會挖到'); return; }
+      S.active = S.active===f.id ? null : f.id; save(); renderBag(); renderFilterStrip();
+      toast(S.active?'下一張照片會套用「'+f.name+'」':'已取消套用濾鏡');
+    });
+    grid.append(card);
+  });
+  const sgrid=el('div',{class:'sgrid'});
+  STICKERS.forEach(s=>{
+    const n=S.stickers[s.id]||0, seen=S.seenStk[s.id]||n>0;
+    sgrid.append(el('div',{class:'scard'+(seen?'':' locked')},
+      el('div',{class:'art'}, el('img',{src:stickerURL(s.id),alt:''})),
+      n>0?el('span',{class:'fc num',text:'×'+n}):null,
+      el('div',{class:'sn',text:seen?stkName(s):'？？？'})));
+  });
+  const tierLine=Object.values(TIERS).map(t=>t.name+' '+t.w+'%').join('、');
+  p.replaceChildren(
+    el('div',{class:'stats'},
+      el('div',{class:'stat'},el('div',{class:'num',text:S.tokens}),el('div',{class:'muted',text:'拍照機會'})),
+      el('div',{class:'stat'},el('div',{class:'num',text:S.uploads}),el('div',{class:'muted',text:'相簿上傳券'})),
+      el('div',{class:'stat'},el('div',{class:'num',text:fTotal}),el('div',{class:'muted',text:'濾鏡次數'})),
+      el('div',{class:'stat'},el('div',{class:'num',text:sTotal}),el('div',{class:'muted',text:'貼紙'}))),
+    el('div',{class:'section-title',text:'濾鏡收藏（點一下裝備）'}), grid,
+    el('div',{class:'section-title',text:'貼紙收藏（拍完照在編輯畫面使用）'}), sgrid,
+    el('div',{class:'section-title',text:'怎麼拿到道具'}),
+    el('div',{class:'card odds'},
+      el('div',null,'每放下一塊礦石隨機掉落：稀有寶石 ',el('b',{text:'2%'}),'（+150 分）、濾鏡 ',el('b',{text:'5%'}),'、貼紙 ',el('b',{text:'5%'}),'、夢幻礦石 ',el('b',{text:'1.5%'}),'（相簿上傳券）'),
+      el('div',null,'濾鏡稀有度：'+tierLine),
+      el('div',null,'每 ',el('b',{text:String(TARGET_SCORE)}),' 分拿 1 次拍照機會，每天最多 ',el('b',{text:String(DAILY_TOKEN_CAP)}),' 次'),
+      el('div',null,'每消掉一格有 ',el('b',{text:'約 1.2%'}),' 機會挖到幫手礦石')));
+}
+function renderChips(){
+  $('#chipTokens').textContent=S.tokens; $('#chipUploads').textContent=S.uploads;
+  $('#camTokens').textContent='拍照機會 '+S.tokens; $('#albumCount').textContent=S.uploads;
+}
+
+/* =========================================================
+   帳號 / 好友 / 貼文 / 留言
+   ========================================================= */
+const Social={mine:[], addedMe:[], mutual:[], pendingIn:[], pendingOut:[], profiles:{}, posts:{}, reacts:[], comments:[], view:'feed', open:new Set(), drafts:{}};
+const avatarCache={};
+function avatarFor(id){
+  const pr=Social.profiles[id]||(id===Cloud.id?Cloud.profile:null);
+  if(pr&&typeof pr.avatar==='string'&&pr.avatar.startsWith('data:image/')) return pr.avatar;
+  if(pr&&typeof pr.photo==='string'&&pr.photo.startsWith('https://')) return pr.photo;
+  return avatarCache[id]||'';
+}
+function nickFor(id){ const pr=id===Cloud.id?Cloud.profile:Social.profiles[id]; return (pr&&typeof pr.nick==='string'&&pr.nick)||'礦工'; }
+function avNode(id,cls){ const src=avatarFor(id); return el('div',{class:'av'+(cls?' '+cls:'')}, src?el('img',{src,alt:'',referrerpolicy:'no-referrer'}):null); }
+async function resolvePlatformAvatars(ids){
+  if(!Cloud.user||!ids.length) return;
+  try{ const ps=await Cloud.user.profiles(ids); for(const id of ids) if(ps[id]) avatarCache[id]=ps[id].avatarUrl; }catch(e){}
+}
+function renderAvatarBtn(){
+  const b=$('#avatarBtn'); const src=Cloud.id?avatarFor(Cloud.id):'';
+  b.replaceChildren(src?el('img',{src,alt:'',referrerpolicy:'no-referrer'}):el('span',{style:'font-size:18px',text:'⚙︎'}));
+}
+function genCode(){ const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<6;i++) s+=a[rand(a.length)]; return s; }
+
+/* ---------- Firebase 連線（包成跟原本一樣的介面） ---------- */
+let FB=null, fbAuth=null, fs=null;
+const wrapDoc = x => ({id:x.id, exists:x.exists(), data:()=>x.data()});
+const wrapQuery = q => ({docs:q.docs.map(wrapDoc), empty:q.empty, size:q.size});
+function docRef(path){
+  const r=FB.doc(fs,path);
+  return { id:r.id, path,
+    get:async()=>wrapDoc(await FB.getDoc(r)),
+    set:d=>FB.setDoc(r,d), update:d=>FB.updateDoc(r,d), delete:()=>FB.deleteDoc(r),
+    onSnapshot:(n,e)=>FB.onSnapshot(r,x=>n(wrapDoc(x)),e) };
+}
+function colRef(path, cons){
+  cons=cons||[];
+  const build=()=>FB.query(FB.collection(fs,path),...cons);
+  return {
+    where:(f,op,v)=>colRef(path,[...cons,FB.where(f,op,v)]),
+    orderBy:(f,d)=>colRef(path,[...cons,FB.orderBy(f,d||'asc')]),
+    limit:n=>colRef(path,[...cons,FB.limit(n)]),
+    get:async()=>wrapQuery(await FB.getDocs(build())),
+    onSnapshot:(n,e)=>FB.onSnapshot(build(),q=>n(wrapQuery(q)),e),
+    doc:id=>docRef(id ? path+'/'+id : FB.doc(FB.collection(fs,path)).path),
+    add:async d=>docRef((await FB.addDoc(FB.collection(fs,path),d)).path)
+  };
+}
+const DB={doc:docRef, collection:p=>colRef(p)};
+
+async function initCloud(){
+  if(!FIREBASE_READY){ Cloud.ready=true; renderFriends(true); return; }
+  try{
+    const base='https://www.gstatic.com/firebasejs/'+FIREBASE_VERSION+'/';
+    const [appM,authM,fsM]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
+    FB=Object.assign({},authM,fsM);
+    const app=appM.initializeApp(firebaseConfig);
+    fbAuth=authM.getAuth(app); fs=fsM.getFirestore(app);
+  }catch(e){ console.error(e); Cloud.ready=true; Cloud.loadFailed=true; renderFriends(true); return; }
+  FB.onAuthStateChanged(fbAuth, user=>{
+    if(user){
+      if(Cloud.id&&Cloud.id!==user.uid){ location.reload(); return; }
+      if(!Cloud.id) startCloudFor(user);
+    } else {
+      if(Cloud.id){ location.reload(); return; }
+      Cloud.ready=true; renderFriends(true); renderAvatarBtn();
+    }
+  });
+}
+async function startCloudFor(user){
+  Cloud.id=user.uid; Cloud.db=DB; Cloud.writable=true;
+  Cloud.me={name:user.displayName||'', avatarUrl:user.photoURL||''};
+  if(user.photoURL) avatarCache[user.uid]=user.photoURL;
+  Cloud.ready=true;
+  try{
+    const snap=await Cloud.db.doc('data/users/'+Cloud.id+'/state').get();
+    if(snap.exists){ const cs=snap.data().s; if(cs&&(cs.at||0)>(S.at||0)){ S=normalize(cs); try{localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){} renderAll(); } else pushCloud(); }
+    else pushCloud();
+  }catch(e){ console.error(e); }
+  try{ const p=await Cloud.db.doc('profiles/'+Cloud.id).get(); if(p.exists) Cloud.profile=p.data(); }catch(e){ console.error(e); }
+  renderAvatarBtn();
+  if(!Cloud.profile) await onboarding();
+  else if(user.photoURL&&Cloud.profile.photo!==user.photoURL) writeProfile({photo:user.photoURL});
+  subscribeSocial(); cleanupMyPosts(); renderFriends(true);
+}
+function loginErr(e){
+  const c=(e&&e.code)||'';
+  const map={
+    'auth/popup-blocked':'瀏覽器擋住了登入視窗，請允許彈出視窗後再試一次',
+    'auth/unauthorized-domain':'這個網址還沒加進 Firebase 的授權網域',
+    'auth/invalid-credential':'Email 或密碼不對', 'auth/wrong-password':'Email 或密碼不對', 'auth/user-not-found':'Email 或密碼不對',
+    'auth/email-already-in-use':'這個 Email 已經註冊過了，請直接按「登入」',
+    'auth/weak-password':'密碼至少要 6 個字', 'auth/invalid-email':'Email 格式不對', 'auth/missing-password':'請輸入密碼',
+    'auth/operation-not-allowed':'Firebase 還沒開啟這種登入方式',
+    'auth/network-request-failed':'網路連不上，請稍後再試'
+  };
+  if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request') return;
+  toast(map[c]||'登入失敗，請再試一次');
+}
+async function loginGoogle(){ if(!FB) return; try{ await FB.signInWithPopup(fbAuth,new FB.GoogleAuthProvider()); }catch(e){ loginErr(e); } }
+async function loginEmail(email,pw,isNew){
+  if(!FB) return;
+  try{ if(isNew) await FB.createUserWithEmailAndPassword(fbAuth,email,pw); else await FB.signInWithEmailAndPassword(fbAuth,email,pw); }
+  catch(e){ loginErr(e); }
+}
+function loginPanel(){
+  if(!FIREBASE_READY) return el('div',{class:'empty'}, el('b',{text:'還沒設定 Firebase'}), '請把 Firebase 的設定貼到 index.html 最上面的 firebaseConfig。沒登入也可以先玩遊戲。');
+  if(Cloud.loadFailed) return el('div',{class:'empty'}, el('b',{text:'連不上登入服務'}), '請檢查網路後重新整理頁面。沒登入也可以先玩遊戲。');
+  if(!FB) return el('div',{class:'empty'}, el('b',{text:'正在連線…'}));
+  const em=el('input',{type:'email',placeholder:'Email',autocomplete:'email','aria-label':'Email'});
+  const pw=el('input',{type:'password',placeholder:'密碼（至少 6 個字）',autocomplete:'current-password','aria-label':'密碼'});
+  return el('div',{class:'card'},
+    el('div',{class:'me-name',text:'登入 Picminer'}),
+    el('p',{class:'muted',style:'margin:4px 0 12px',text:'登入後就能加好友、發照片，遊戲進度也會同步到每台裝置。沒登入也可以先玩遊戲。'}),
+    el('button',{class:'btn gold',style:'width:100%',text:'用 Google 登入',onclick:loginGoogle}),
+    el('div',{class:'muted center',style:'margin:14px 0 2px',text:'或用 Email'}),
+    el('label',{class:'field',style:'margin:8px 0'}, em), el('label',{class:'field',style:'margin:8px 0'}, pw),
+    el('div',{class:'row2'},
+      el('button',{class:'btn ghosty',text:'註冊新帳號',onclick:()=>loginEmail(em.value.trim(),pw.value,true)}),
+      el('button',{class:'btn',text:'登入',onclick:()=>loginEmail(em.value.trim(),pw.value,false)})),
+    el('p',{class:'muted',style:'margin:12px 0 0',text:'在 LINE 或 IG 裡面打開時，Google 登入可能會被擋，請改用 Safari／Chrome 打開，或用 Email 登入。'}));
+}
+async function onboarding(){
+  let avatar='';
+  const nick=el('input',{maxlength:'16',value:(Cloud.me&&Cloud.me.name)||'',placeholder:'朋友會看到的名字'});
+  const big=el('div',{class:'big-av'}, avatarCache[Cloud.id]?el('img',{src:avatarCache[Cloud.id],alt:'',referrerpolicy:'no-referrer'}):null);
+  const pick=el('input',{type:'file',accept:'image/*',hidden:true});
+  pick.addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; avatar=await avatarFromFile(f); big.replaceChildren(el('img',{src:avatar,alt:''})); });
+  $('#sheet').dataset.locked='1';
+  await openSheet(
+    el('h2',{text:'建立你的礦工名片'}),
+    el('p',{text:'朋友輸入你的好友代碼就能加你。'}),
+    big, el('div',{class:'center'}, el('button',{class:'linkish',text:'換一張頭貼',onclick:()=>pick.click()})), pick,
+    el('label',{class:'field'}, el('span',{text:'暱稱'}), nick),
+    el('div',{class:'actions'}, el('button',{class:'btn gold',text:'開始挖礦',onclick:()=>closeSheet(true)})));
+  let code=genCode();
+  for(let i=0;i<5;i++){ try{ const q=await Cloud.db.collection('profiles').where('code','==',code).limit(1).get(); if(q.empty) break; }catch(e){ break; } code=genCode(); }
+  await writeProfile({nick:(nick.value.trim()||'礦工').slice(0,16), avatar, photo:(Cloud.me&&Cloud.me.avatarUrl)||'', code, highScore:S.highScore});
+  renderAvatarBtn();
+}
+function avatarFromFile(file){
+  return loadImageFile(file).then(im=>{ const cv=document.createElement('canvas'); cv.width=cv.height=160; drawCover(cv.getContext('2d'),160,160,im,im.naturalWidth,im.naturalHeight,false,1); return cv.toDataURL('image/jpeg',.8); });
+}
+
+const postSubs=new Map(); let reactUnsub=null, cmtUnsub=null, postKeyStr='';
+function subscribeSocial(){
+  const db=Cloud.db, id=Cloud.id;
+  db.doc('links/'+id).onSnapshot(s=>{ const d=s.exists?s.data():null; Social.mine=Array.isArray(d&&d.ids)?d.ids.filter(x=>typeof x==='string'):[]; recompute(); },()=>{});
+  db.collection('links').where('ids','array-contains',id).onSnapshot(q=>{ Social.addedMe=q.docs.map(d=>d.id).filter(x=>x!==id); recompute(); },()=>{});
+}
+async function recompute(){
+  const mine=new Set(Social.mine), them=new Set(Social.addedMe);
+  Social.mutual=Social.mine.filter(x=>them.has(x));
+  Social.pendingIn=Social.addedMe.filter(x=>!mine.has(x));
+  Social.pendingOut=Social.mine.filter(x=>!them.has(x));
+  $('#friendDot').style.display=Social.pendingIn.length?'block':'none';
+  await loadProfiles([...Social.mine,...Social.addedMe]);
+  resubscribePosts([Cloud.id,...Social.mutual]);
+  renderFriends();
+}
+async function loadProfiles(ids, force){
+  const need=[...new Set(ids)].filter(x=>force||!Social.profiles[x]);
+  await Promise.all(need.map(async uid=>{ try{ const s=await Cloud.db.doc('profiles/'+uid).get(); if(s.exists) Social.profiles[uid]=s.data(); }catch(e){} }));
+  await resolvePlatformAvatars(need);
+}
+function resubscribePosts(ids){
+  ids=ids.slice(0,40);
+  for(const [k,un] of postSubs) if(!ids.includes(k)){ un(); postSubs.delete(k); delete Social.posts[k]; }
+  ids.forEach(uid=>{
+    if(postSubs.has(uid)) return;
+    const un=Cloud.db.collection('posts/'+uid+'/items').orderBy('createdAt','desc').limit(8).onSnapshot(q=>{
+      Social.posts[uid]=q.docs.map(d=>Object.assign({},d.data(),{id:d.id,author:uid})); onPostsChanged();
+    },()=>{});
+    postSubs.set(uid,un);
+  });
+}
+function visiblePosts(){
+  const now=Date.now();
+  return Object.values(Social.posts).flat().filter(p=>p&&p.expiresAt>now&&typeof p.img==='string'&&p.img.startsWith('data:image/')).sort((a,b)=>b.createdAt-a.createdAt);
+}
+const pkey=p=>p.author+'~'+p.id;
+function onPostsChanged(){
+  const keys=visiblePosts().slice(0,30).map(pkey), k=keys.join(',');
+  if(k!==postKeyStr){
+    postKeyStr=k;
+    if(reactUnsub){reactUnsub();reactUnsub=null;} if(cmtUnsub){cmtUnsub();cmtUnsub=null;}
+    Social.reacts=[]; Social.comments=[];
+    if(keys.length){
+      reactUnsub=Cloud.db.collection('reactions').where('post','in',keys).onSnapshot(q=>{ Social.reacts=q.docs.map(d=>d.data()); renderFriends(); },()=>{});
+      cmtUnsub=Cloud.db.collection('comments').where('post','in',keys).onSnapshot(q=>{
+        Social.comments=q.docs.map(d=>Object.assign({},d.data(),{_id:d.id})).filter(c=>typeof c.text==='string');
+        const ids=[...new Set(Social.comments.map(c=>c.by))].filter(x=>x&&!Social.profiles[x]&&x!==Cloud.id);
+        if(ids.length) loadProfiles(ids).then(()=>renderFriends()); else renderFriends();
+      },()=>{});
+    }
+  }
+  renderFriends();
+}
+async function cleanupMyPosts(){
+  try{ const q=await Cloud.db.collection('posts/'+Cloud.id+'/items').get(); const now=Date.now();
+    for(const d of q.docs){ if((d.data().expiresAt||0)<now) await Cloud.db.doc('posts/'+Cloud.id+'/items/'+d.id).delete(); } }catch(e){}
+}
+async function createPost(img, filter, kind, caption){
+  if(!Cloud.db||!Cloud.writable) return false;
+  try{
+    const ref=Cloud.db.collection('posts/'+Cloud.id+'/items').doc();
+    const now=Date.now();
+    await ref.set({img, caption:caption||'', filter:filter||null, kind, createdAt:now, expiresAt:now+POST_TTL});
+    Social.view='feed'; return true;
+  }catch(e){ writeErr(e); return false; }
+}
+async function postMenu(p){
+  const r=await openSheet(el('div',{class:'menu'},
+    el('button',{class:'menu-item',text:'編輯內文',onclick:()=>closeSheet('edit')}),
+    el('button',{class:'menu-item danger',text:'刪除貼文',onclick:()=>closeSheet('del')}),
+    el('button',{class:'menu-item',text:'取消',onclick:()=>closeSheet(null)})));
+  if(r==='edit') editCaption(p); else if(r==='del') deletePost(p);
+}
+async function editCaption(p){
+  const ta=el('textarea',{maxlength:'200','aria-label':'貼文內文',value:p.caption||''});
+  const ok=await openSheet(el('h2',{text:'編輯內文'}), ta,
+    el('div',{class:'actions'}, el('button',{class:'btn ghosty',text:'取消',onclick:()=>closeSheet(false)}), el('button',{class:'btn',text:'儲存',onclick:()=>closeSheet(true)})));
+  if(!ok) return;
+  try{ await Cloud.db.doc('posts/'+Cloud.id+'/items/'+p.id).update({caption:ta.value.trim().slice(0,200), editedAt:Date.now()}); toast('內文已更新'); }
+  catch(e){ writeErr(e); toast('更新失敗，稍後再試'); }
+}
+async function deletePost(p){
+  if(!await confirmSheet('刪除這則貼文？','刪除後朋友就看不到了，用掉的道具不會退回。','刪除')) return;
+  try{
+    await Cloud.db.doc('posts/'+Cloud.id+'/items/'+p.id).delete();
+    const key=pkey(p);
+    for(const c of Social.comments.filter(c=>c.post===key)) Cloud.db.doc('comments/'+c._id).delete().catch(()=>{});
+    for(const r of Social.reacts.filter(r=>r.post===key)) Cloud.db.doc('reactions/'+key+'~'+r.by).delete().catch(()=>{});
+  }catch(e){ writeErr(e); }
+}
+const reactQ={};
+function react(p, emoji){
+  if(!Cloud.writable) return;
+  const key=pkey(p), docId=key+'~'+Cloud.id;
+  const mine=Social.reacts.find(r=>r.post===key&&r.by===Cloud.id);
+  const ref=Cloud.db.doc('reactions/'+docId);
+  reactQ[docId]=(reactQ[docId]||Promise.resolve()).then(()=> mine&&mine.emoji===emoji ? ref.delete() : ref.set({post:key,by:Cloud.id,emoji,at:Date.now()})).catch(writeErr);
+}
+async function sendComment(p, input){
+  const text=input.value.trim().slice(0,200); if(!text||!Cloud.writable) return;
+  const key=pkey(p); input.value=''; Social.drafts[key]=''; Social.open.add(key);
+  input.blur();
+  try{ await Cloud.db.collection('comments').add({post:key, by:Cloud.id, text, at:Date.now()}); }
+  catch(e){ writeErr(e); toast('留言失敗，稍後再試'); }
+}
+async function deleteComment(c){
+  if(!await confirmSheet('刪除這則留言？','刪除後就看不到了。','刪除')) return;
+  try{ await Cloud.db.doc('comments/'+c._id).delete(); }catch(e){ writeErr(e); }
+}
+let linkQ=Promise.resolve();
+function setLinks(ids){ linkQ=linkQ.then(()=>Cloud.db.doc('links/'+Cloud.id).set({ids:[...new Set(ids)],at:Date.now()})).catch(writeErr); return linkQ; }
+async function addByCode(code){
+  code=(code||'').trim().toUpperCase(); if(!code) return;
+  if(Cloud.profile&&code===Cloud.profile.code){ toast('這是你自己的代碼'); return; }
+  try{
+    const q=await Cloud.db.collection('profiles').where('code','==',code).limit(1).get();
+    if(q.empty){ toast('找不到這個好友代碼，請再確認一次'); return; }
+    const uid=q.docs[0].id; Social.profiles[uid]=q.docs[0].data();
+    if(Social.mine.includes(uid)){ toast('已經加過了'); return; }
+    await setLinks([...Social.mine,uid]);
+    toast(Social.addedMe.includes(uid)?'你們現在是好友了':'等對方也加你，就能看到彼此的動態',{title:'已加「'+nickFor(uid)+'」'});
+  }catch(e){ toast('現在連不上，稍後再試'); }
+}
+async function removeFriend(uid){
+  if(!await confirmSheet('移除好友？','移除後你們就看不到彼此的動態。','移除')) return;
+  setLinks(Social.mine.filter(x=>x!==uid));
+}
+
+// 打字時不要重畫（避免鍵盤收起來），離開輸入框後再補畫
+let friendsDirty=false;
+$('#friendsPane').addEventListener('focusout',()=>setTimeout(()=>{ if(friendsDirty) renderFriends(); },300));
+function postCard(pst){
+  const key=pkey(pst);
+  const rs=Social.reacts.filter(r=>r.post===key), mineR=rs.find(r=>r.by===Cloud.id);
+  const foot=el('div',{class:'post-foot'});
+  REACTIONS.forEach(em=>{ const n=rs.filter(r=>r.emoji===em).length;
+    foot.append(el('button',{class:'react','aria-pressed':String(!!mineR&&mineR.emoji===em),'aria-label':em,disabled:!Cloud.writable||null,onclick:()=>react(pst,em)}, em, n?el('span',{class:'num',text:n}):null)); });
+  if(pst.filter&&F[pst.filter]) foot.append(el('span',{class:'tag',text:F[pst.filter].name}));
+  else if(pst.kind==='album') foot.append(el('span',{class:'tag',text:'相簿'}));
+
+  const dots=pst.author===Cloud.id ? el('button',{class:'dots','aria-label':'更多選項',onclick:()=>postMenu(pst)}) : null;
+  if(dots) dots.innerHTML=DOTS_SVG;
+
+  const cmts=Social.comments.filter(c=>c.post===key).sort((a,b)=>a.at-b.at);
+  const open=Social.open.has(key);
+  const shown=open?cmts:cmts.slice(-2);
+  const cbox=el('div',{class:'comments'});
+  if(cmts.length>2&&!open) cbox.append(el('button',{class:'more',text:'查看全部 '+cmts.length+' 則留言',onclick:()=>{Social.open.add(key);renderFriends(true);}}));
+  shown.forEach(c=>{
+    const canDel=c.by===Cloud.id||pst.author===Cloud.id;
+    cbox.append(el('div',{class:'cmt'}, avNode(c.by,'xs'),
+      el('div',{class:'body'}, el('b',{text:nickFor(c.by)}), c.text,
+        el('div',{class:'meta'}, ago(c.at), canDel&&Cloud.writable?el('button',{text:'刪除',onclick:()=>deleteComment(c)}):null))));
+  });
+  if(Cloud.writable){
+    const inp=el('input',{placeholder:'留言…',maxlength:'200','aria-label':'留言',value:Social.drafts[key]||'',
+      oninput:e=>{Social.drafts[key]=e.target.value;}, onkeydown:e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); sendComment(pst,inp); } }});
+    const send=el('button',{class:'btn small',text:'送出'});
+    send.addEventListener('pointerdown',e=>{ e.preventDefault(); sendComment(pst,inp); });
+    cbox.append(el('div',{class:'cmt-input'}, inp, send));
+  }
+  return el('article',{class:'post'},
+    el('div',{class:'post-head'}, avNode(pst.author,'sm'),
+      el('div',{style:'flex:1;min-width:0'}, el('div',{class:'name',text:pst.author===Cloud.id?nickFor(pst.author)+'（你）':nickFor(pst.author)}), el('div',{class:'muted',text:ago(pst.createdAt)+'，'+left(pst.expiresAt)})),
+      dots),
+    el('img',{src:pst.img,alt:nickFor(pst.author)+' 的照片',loading:'lazy'}),
+    foot,
+    pst.caption?el('p',{class:'caption'}, el('b',{text:nickFor(pst.author)}), String(pst.caption), pst.editedAt?el('span',{class:'edited',text:'（已編輯）'}):null):null,
+    cbox);
+}
+function renderFriends(force){
+  const p=$('#friendsPane'); if(!p) return;
+  const ae=document.activeElement;
+  if(!force&&ae&&p.contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){ friendsDirty=true; return; }
+  friendsDirty=false;
+  if(!Cloud.db){
+    p.replaceChildren(loginPanel());
+    return;
+  }
+  const scrollY=$('#tab-friends').scrollTop;
+  const nodes=[];
+  if(!Cloud.writable) nodes.push(el('div',{class:'banner',text:'目前沒有寫入權限，請確認 Firebase 的安全規則已經貼上並發佈。'}));
+  const code=(Cloud.profile&&Cloud.profile.code)||'------';
+  const input=el('input',{placeholder:'輸入好友代碼',maxlength:'6','aria-label':'好友代碼'});
+  nodes.push(el('div',{class:'card'},
+    el('div',{class:'me-card'}, avNode(Cloud.id),
+      el('div',{style:'flex:1;min-width:0'}, el('div',{class:'me-name',text:nickFor(Cloud.id)}), el('div',{class:'muted'},'好友代碼 ',el('span',{class:'code',text:code}))),
+      el('button',{class:'btn small ghosty',text:'複製',onclick:()=>{ try{ navigator.clipboard.writeText(code); toast('已複製好友代碼'); }catch(e){ toast('代碼：'+code); } }})),
+    el('div',{class:'addrow'}, input, el('button',{class:'btn',text:'加好友',disabled:!Cloud.writable||null,onclick:()=>addByCode(input.value)}))));
+  if(Social.pendingIn.length){
+    nodes.push(el('div',{class:'section-title',text:'想加你為好友'}));
+    const c=el('div',{class:'card',style:'padding:4px 14px'});
+    Social.pendingIn.forEach(uid=>c.append(el('div',{class:'list-item'}, avNode(uid,'sm'), el('div',{class:'grow',text:nickFor(uid)}),
+      el('button',{class:'btn small gold',text:'加回去',disabled:!Cloud.writable||null,onclick:()=>setLinks([...Social.mine,uid])}))));
+    nodes.push(c);
+  }
+  const tabs=[['feed','動態'],['rank','排行'],['list','好友']];
+  nodes.push(el('div',{class:'seg',role:'tablist'}, tabs.map(([k,l])=>el('button',{role:'tab','aria-selected':String(Social.view===k),text:l,onclick:()=>{Social.view=k; if(k!=='feed') loadProfiles([Cloud.id,...Social.mutual],true).then(()=>renderFriends()); renderFriends(true);}}))));
+
+  if(Social.view==='feed'){
+    const posts=visiblePosts();
+    if(!posts.length) nodes.push(el('div',{class:'empty'}, el('b',{text:'這 24 小時還沒有動態'}), Social.mutual.length?'挖礦拿到拍照機會，就能發第一張。':'先把好友代碼傳給朋友，互加之後就會看到彼此的照片。'));
+    posts.forEach(pst=>nodes.push(postCard(pst)));
+  } else if(Social.view==='rank'){
+    const ids=[Cloud.id,...Social.mutual];
+    const list=ids.map(id=>({id,hs:(id===Cloud.id?Math.max(S.highScore,(Cloud.profile&&Cloud.profile.highScore)||0):((Social.profiles[id]&&Social.profiles[id].highScore)||0))})).sort((a,b)=>b.hs-a.hs);
+    const c=el('div',{class:'card',style:'padding:4px 14px'});
+    list.forEach((x,i)=>c.append(el('div',{class:'list-item'}, el('div',{class:'rank num',text:i+1}), avNode(x.id,'sm'),
+      el('div',{class:'grow',style:x.id===Cloud.id?'font-weight:700':null,text:nickFor(x.id)+(x.id===Cloud.id?'（你）':'')}), el('div',{class:'num',style:'font-weight:800',text:x.hs}))));
+    nodes.push(c);
+    if(!Social.mutual.length) nodes.push(el('p',{class:'muted center',text:'互加好友後就會出現在排行榜上'}));
+  } else {
+    const c=el('div',{class:'card',style:'padding:4px 14px'});
+    Social.mutual.forEach(uid=>c.append(el('div',{class:'list-item'}, avNode(uid,'sm'), el('div',{class:'grow',text:nickFor(uid)}),
+      el('button',{class:'btn small ghosty',text:'移除',disabled:!Cloud.writable||null,onclick:()=>removeFriend(uid)}))));
+    Social.pendingOut.forEach(uid=>c.append(el('div',{class:'list-item'}, avNode(uid,'sm'), el('div',{class:'grow'}, el('div',{text:nickFor(uid)}), el('div',{class:'muted',text:'等對方加你'})),
+      el('button',{class:'btn small ghosty',text:'取消',disabled:!Cloud.writable||null,onclick:()=>setLinks(Social.mine.filter(x=>x!==uid))}))));
+    if(!c.children.length) nodes.push(el('div',{class:'empty'}, el('b',{text:'還沒有好友'}), '把上面的好友代碼傳給朋友吧。'));
+    else nodes.push(c);
+  }
+  p.replaceChildren(...nodes);
+  $('#tab-friends').scrollTop=scrollY;
+}
+
+/* =========================================================
+   設定
+   ========================================================= */
+$('#avatarBtn').addEventListener('click',()=>{
+  const items=[el('h2',{text:'設定'})];
+  if(Cloud.db&&Cloud.profile){
+    const nick=el('input',{maxlength:'16',value:Cloud.profile.nick||''});
+    const big=el('div',{class:'big-av'}, avatarFor(Cloud.id)?el('img',{src:avatarFor(Cloud.id),alt:'',referrerpolicy:'no-referrer'}):null);
+    const pick=el('input',{type:'file',accept:'image/*',hidden:true});
+    pick.addEventListener('change',async e=>{ const f=e.target.files[0]; if(!f) return; const a=await avatarFromFile(f); await writeProfile({avatar:a}); big.replaceChildren(el('img',{src:a,alt:''})); renderAvatarBtn(); renderFriends(true); });
+    items.push(big, el('div',{class:'center'}, el('button',{class:'linkish',text:'更改頭貼',onclick:()=>pick.click()}),
+        Cloud.profile.avatar?el('span',null,'　',el('button',{class:'linkish',text:'改回帳號頭貼',onclick:async()=>{ await writeProfile({avatar:''}); closeSheet(); renderAvatarBtn(); renderFriends(true); }})):null), pick,
+      el('label',{class:'field'}, el('span',{text:'暱稱'}), nick),
+      el('div',{class:'muted',style:'margin-bottom:8px'},'好友代碼 ',el('span',{class:'code',text:Cloud.profile.code||''})),
+      el('div',{class:'actions'}, el('button',{class:'btn',text:'儲存',disabled:!Cloud.writable||null,onclick:async()=>{ await writeProfile({nick:(nick.value.trim()||'礦工').slice(0,16)}); closeSheet(); renderFriends(true); toast('已儲存'); }})));
+  } else {
+    items.push(el('p',{text:'到「好友」分頁登入後，就能設定暱稱、頭貼和好友代碼。'}), el('div',{class:'actions'}, el('button',{class:'btn',text:'去登入',onclick:()=>{ closeSheet(); showTab('friends'); }})));
+  }
+  items.push(el('div',{class:'section-title',text:'聯絡我們'}), el('p',null, el('a',{class:'linkish',href:'mailto:'+CONTACT,text:CONTACT})));
+  if(Cloud.id&&FB) items.push(el('button',{class:'btn ghosty',style:'width:100%;margin-top:8px',text:'登出',onclick:async()=>{ closeSheet(); try{ await FB.signOut(fbAuth); }catch(e){} }}));
+  openSheet(...items);
+});
+
+/* =========================================================
+   分頁切換
+   ========================================================= */
+let currentTab='game';
+document.querySelectorAll('.tabbar button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+function showTab(t){
+  currentTab=t;
+  document.querySelectorAll('.tabbar button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('active',s.id==='tab-'+t));
+  if(t==='camera'){ renderFilterStrip(); startCamera(); } else stopCamera();
+  if(t==='game') renderTray();
+  if(t==='friends'){ if(Cloud.db&&Cloud.ready) loadProfiles([...Social.mine,...Social.addedMe],true).then(()=>renderFriends()); renderFriends(true); }
+  if(t==='bag') renderBag();
+}
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopCamera(); else if(currentTab==='camera') startCamera(); });
+window.addEventListener('resize',()=>{ if(currentTab==='game'&&!drag) renderTray(); });
+
+function renderAll(){ renderGame(); renderBag(); renderFilterStrip(); renderChips(); renderFriends(true); }
+if(S.daily.date!==todayStr()) S.daily={date:todayStr(),n:0};
+renderAll(); renderAvatarBtn();
+initCloud();
+</script>
+</body>
+</html>
