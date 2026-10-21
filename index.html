@@ -363,17 +363,27 @@ textarea{width:100%;min-height:70px;border-radius:14px;border:1px solid var(--li
 <script type="module">
 'use strict';
 /* =========================================================
-   ★ Firebase 設定：把 Firebase 主控台給你的設定貼在這裡 ★
+   Firebase 設定放在同一個資料夾的 firebase-config.txt
+   （這個 index.html 不用改）
    ========================================================= */
-const firebaseConfig = {
-  apiKey: "AIzaSyBS_LFnYySNNj6FGK8WZKPbN8LTORKayRY",
-  authDomain: "picminer-e34cf.firebaseapp.com",
-  projectId: "picminer-e34cf",
-  storageBucket: "picminer-e34cf.firebasestorage.app",
-  messagingSenderId: "987076813654",
-  appId: "1:987076813654:web:a03e655d1cc442a7a46cf7"
-};
 const FIREBASE_VERSION = '12.18.0';
+let firebaseConfig = null, configStatus = 'loading'; // loading | ok | missing | bad
+async function loadFirebaseConfig(){
+  try{
+    const r = await fetch('firebase-config.txt', {cache:'no-store'});
+    if(!r.ok){ configStatus='missing'; return; }
+    const t = await r.text();
+    const pick = k => { const m = t.match(new RegExp(k + '["\']?\\s*:\\s*["\'`]([^"\'`]+)["\'`]')); return m ? m[1].trim() : ''; };
+    const c = {};
+    for(const k of ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId']){ const v=pick(k); if(v) c[k]=v; }
+    if(!c.apiKey || !c.projectId || !c.appId || /請貼上|你的專案/.test(c.apiKey+c.projectId)){ configStatus='bad'; return; }
+    if(!c.authDomain) c.authDomain = c.projectId + '.firebaseapp.com';
+    firebaseConfig = c; configStatus = 'ok';
+  }catch(e){ configStatus='missing'; }
+}
+// 有任何錯誤就顯示在畫面上，方便找問題
+window.addEventListener('error', e=>{ try{ toast(String(e.message||e.error||'未知錯誤'),{title:'程式出錯了',ms:6000}); }catch(_){} });
+window.addEventListener('unhandledrejection', e=>{ try{ const r=e.reason; if(r&&r.code&&String(r.code).startsWith('auth/')) return; toast(String((r&&(r.message||r.code))||r),{title:'程式出錯了',ms:6000}); }catch(_){} });
 /* =========================================================
    設定值
    ========================================================= */
@@ -1245,7 +1255,8 @@ function colRef(path, cons){
 const DB={doc:docRef, collection:p=>colRef(p)};
 
 async function initCloud(){
-  if(!FIREBASE_READY){ Cloud.ready=true; renderFriends(true); return; }
+  await loadFirebaseConfig();
+  if(configStatus!=='ok'){ Cloud.ready=true; renderFriends(true); return; }
   try{
     const base='https://www.gstatic.com/firebasejs/'+FIREBASE_VERSION+'/';
     const [appM,authM,fsM]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
@@ -1300,7 +1311,9 @@ async function loginEmail(email,pw,isNew){
   catch(e){ loginErr(e); }
 }
 function loginPanel(){
-  if(!FIREBASE_READY) return el('div',{class:'empty'}, el('b',{text:'還沒設定 Firebase'}), '請把 Firebase 的設定貼到 index.html 最上面的 firebaseConfig。沒登入也可以先玩遊戲。');
+  if(configStatus==='loading') return el('div',{class:'empty'}, el('b',{text:'正在連線…'}));
+  if(configStatus==='missing') return el('div',{class:'empty'}, el('b',{text:'找不到 firebase-config.txt'}), '請在 GitHub 上和 index.html 同一個地方建立 firebase-config.txt，貼上 Firebase 的設定。沒登入也可以先玩遊戲。');
+  if(configStatus==='bad') return el('div',{class:'empty'}, el('b',{text:'firebase-config.txt 內容不完整'}), '裡面要有 apiKey、projectId、appId。請到 Firebase 專案設定重新複製整段設定貼上。沒登入也可以先玩遊戲。');
   if(Cloud.loadFailed) return el('div',{class:'empty'}, el('b',{text:'連不上登入服務'}), '請檢查網路後重新整理頁面。沒登入也可以先玩遊戲。');
   if(!FB) return el('div',{class:'empty'}, el('b',{text:'正在連線…'}));
   const em=el('input',{type:'email',placeholder:'Email',autocomplete:'email','aria-label':'Email'});
